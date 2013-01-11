@@ -1,0 +1,8 @@
+
+ // This is a test comment.
+
+if (condition == true)
+    statement := false;
+endif
+
+magic_number := 42;
