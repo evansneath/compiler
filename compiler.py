@@ -38,7 +38,8 @@ def main():
         return False
 
     while True:
-        token = scanner.scan()
+        token = scanner.next_token()
+
         if token.type == 'eof':
             break
 

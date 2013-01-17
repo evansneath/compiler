@@ -1,8 +1,12 @@
 
+string first := "Hello world";
+
  // This is a test comment.
 
-if (condition == true)
-    statement := false;
-endif
+string my_str1ng := "This is a , T3St ; string float int";
+int magic_number := 42;
 
-magic_number := 42;
+if (condition = "foo")
+    float camelCase1 := 1.3;
+end
+
