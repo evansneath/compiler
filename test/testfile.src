@@ -27,11 +27,11 @@ end
 
 // Test a compact formed if statement
 if(foo=bar)then
-    do_something()
+    do_something();
 end
 
 // Test warning handling of unknown characters in strings
-string bad_string := "Too# Many $trange characters here?"
+string bad_string := "Too# Many $trange characters here?";
 
 // Test hanging string error handling. This sends an irrecoverable error.
 string hanging_string := "This is a string that never ends.
