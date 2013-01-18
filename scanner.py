@@ -26,7 +26,7 @@ class Scanner(object):
     keywords = [
         'string', 'int', 'bool', 'float', 'global', 'in', 'out', 'if', 'then',
         'else', 'case', 'for', 'and', 'or', 'not', 'program', 'procedure',
-        'begin', 'return', 'end',
+        'begin', 'return', 'end', 'true', 'false',
     ]
 
     symbols = [
@@ -34,20 +34,17 @@ class Scanner(object):
         '!=', '=', ':=', '{', '}',
     ]
 
-    # More for personal reference, but might be useful
-    token_types = [
-        'keyword',
-        'symbol',
-        'identifier',
-        'string',
-        'int',
-        'bool',
-        'float',
+    # The following characters are allowed in strings along with alphanumberics
+    string_characters = [
+        '_', ',', ';', ':', '.', ',', '\''
     ]
 
 
     def __init__(self):
         super(Scanner, self).__init__()
+
+        # Hold the file path of the attached source file
+        self.src_path = None
 
         # Holds all source file data (code) to be scanned
         self.src = None
@@ -86,7 +83,33 @@ class Scanner(object):
             print('Error: Could not read inputted file')
             return False
 
+        # The file was attached and read successfully, store the path
+        self.src_path = src_path
+
         return True
+
+
+    def print_msg(self, msg, prefix='Error', highlight=-1):
+        """Print Scanner Message
+
+        Prints a formatted message. Used for errors, warnings, or info.
+
+        Arguments:
+            msg: The main message to display
+            prefix: The type of message. Defaults to 'Error'.
+            highlight: If not -1, there will be an underscore under a
+                character in the line to be highlighted.
+        """
+        print(prefix.title(), ': ', sep='', end='')
+        print('\"{0}\", line {1}'.format(self.src_path, self.line_pos+1))
+        print('    ', msg, sep='')
+        print('    ', self.src[self.line_pos][0:-1].strip(), sep='')
+
+        if highlight != -1:
+            print('    {0}^'.format(' '*highlight))
+
+        return
+
 
     def next_token(self):
         """Scan For Next Token
@@ -95,156 +118,275 @@ class Scanner(object):
         returned for parsing.
 
         Returns:
-            The next token object in the source code.
+            The next token object in the source code. None on irrecoverable
+            error.
         """
-        value = ''
-        value_type = None
+        # Store the token type as it is discovered
+        type = None
 
-        # Get the first character, this can narrow down the type of the token
-        if self._skip_spaces() == 'eof':
+        # Get the first character, narrow down the data type possiblilites
+        char = self._next_word()
+
+        if char is None:
             return self.Token('eof', None, self.line_pos+1)
 
-        char = self.src[self.line_pos][self.char_pos]
-
+        # See if the token could be a string
         if char == '\"':
-            # We know this is a string. Find the next quotation and return it
-            string_end = self.src[self.line_pos].find('\"', self.char_pos+1)
+            value, type = self._expect_string(char)
+        elif char.isdigit():
+            value, type = self._expect_number(char)
+        elif char.isalpha():
+            value, type = self._expect_identifier(char)
+        elif char in self.symbols:
+            value, type = self._expect_symbol(char)
+        else:
+            # We've run across a character that should be here
+            msg = 'Invalid character [{0}] encountered'.format(char)
+            self.print_msg(msg, prefix='Warning')
 
-            if string_end != -1:
-                value = self.src[self.line_pos][self.char_pos+1:string_end]
+            # Run this function again until we find something good
+            return self.next_token()
 
-                for index, char in enumerate(value):
-                    if not char.isalnum() and char not in ' _,;:.\'':
-                        value[index] = ' '
-                        print('Error: Invalid character in string (%s), ' + \
-                            'line %s', value, self.line_pos+1)
+        # Build the new token object
+        token = self.Token(type, value, self.line_pos+1)
 
-                self.char_pos += len(value) + 2
+        # Add any newly discovered identifiers to the identifiers table
+        if type == 'identifier' and value not in self.identifiers:
+            self.identifiers[value] = token
+        elif type == 'comment':
+            # If we find a comment, get the next token instead
+            return self.next_token()
+        
+        return token
 
-                return self.Token('string', value, self.line_pos+1)
-            else:
-                print('Error: No string end quotation, line %s', self.line_pos+1)
-                return False
+
+    def _next_word(self):
+        """Get Next Word Character (Protected)
+
+        Move the cursor to the start of the next non-space character in the
+        file.
+
+        Returns:
+            The first non-space character encountered. None if the end of
+            file was reached.
+        """
+        char = ''
 
         while True:
-            valid = False
+            char = self.src[self.line_pos][self.char_pos]
 
-            # Check to see if the value is a comment
-            if value + char == '//':
-                # Skip to the newline
-                self.char_pos = len(self.src[self.line_pos]) - 1
-
-                # Get the next valid character and continue the scan
-                if self._skip_spaces() == 'eof':
-                    return self.Token('eof', None, self.line_pos+1)
-
-                value = ''
-                char = self.src[self.line_pos][self.char_pos]
-
-                continue
-
-            # Check to see if the value is a symbol
-            if self._valid_symbol(value+char):
-                valid = valid or True
-                value_type = 'symbol'
-
-            # Check to see if the value is an identifier
-            if self._valid_identifier(value+char):
-                valid = valid or True
-                value_type = 'identifier'
-
-                # Check to see if it's a keyword
-                if value + char in self.keywords:
-                    value_type = 'keyword'
-
-            # Check to see if the value is an integer
-            if self._valid_int(value+char):
-                valid = valid or True
-                value_type = 'int'
-
-            # Check to see if the value is a float
-            if self._valid_float(value+char):
-                valid = valid or True
-                value_type = 'float'
-
-            if valid:
-                # Good so far, check the next character
-                value = value + char
+            # React according to spaces and newlines
+            if char == '\n':
+                if not self._next_line():
+                    return None
+            elif char in ' \t':
                 self.char_pos += 1
-
-                # Check to make sure we haven't hit a line ending
-                if self.src[self.line_pos][self.char_pos] == '\n':
-                    break
-                else:
-                    char = self.src[self.line_pos][self.char_pos]
             else:
                 break
 
-        # Let's stop here. Last char checked caused illegal identifier
-        return self.Token(value_type, value, self.line_pos+1)
+        # Increment to the next character
+        self.char_pos += 1
+        return char
 
 
-    def _valid_symbol(self, value):
-        if value not in self.symbols:
+    def _next_line(self):
+        """Travel to Next Line (Protected)
+
+        Move the cursor to the start of the next line safely.
+
+        Returns:
+            True on success, False if end of file is encountered
+        """
+        self.line_pos += 1
+        self.char_pos = 0
+
+        # Check to make sure this isn't the end of file
+        if self.line_pos == len(self.src):
             return False
 
         return True
 
 
-    def _valid_identifier(self, value):
-        # The first character can only be [a-zA-Z]
-        if not value[0].isalpha():
-            return False
+    def _next_char(self, peek=False):
+        """Get Next Character (Protected)
 
-        # Every following character may be only [a-zA-Z0-9_]
-        for char in value[1::]:
-            if not char.isalpha() and not char.isdigit() and char != '_':
-                return False
+        Move the cursor to the next character in the file.
 
-        return True
+        Arguments:
+            peek: If True, the character position pointer will not be
+                incremented. Set by default to False.
 
+        Returns:
+            The next character encountered. None if the end of line
+            was reached.
+        """
+        # Get the next pointed character
+        char = self.src[self.line_pos][self.char_pos]
 
-    def _valid_int(self, value):
-        if not value[0].isdigit():
-            return False
+        # Return None if we hit a line ending
+        if char == '\n':
+            return None
 
-        for char in value[1::]:
-            if not char.isdigit() and char != '_':
-                return False
-
-        return True
-
-
-    # TODO: Fix floating point parsing
-    def _valid_float(self, value):
-        if not value[0].isdigit():
-            return False
-
-        if value.count('.') != 1:
-            return False
-
-        decimal_index = value.index('.')
-
-        for char in value[1:decimal_index]:
-            if not char.isdigit() and char != '_':
-                return False
-
-        #for char in value[decimal_index+1:
-        return True
-
-
-    def _skip_spaces(self):
-        # Find the next line if we hit a newline
-        while self.src[self.line_pos][self.char_pos] == '\n':
-            self.line_pos += 1
-            self.char_pos = 0
-
-            if self.line_pos == len(self.src):
-                return 'eof'
-
-        # Find the next non-space character
-        while self.src[self.line_pos][self.char_pos].isspace():
+        # Increment to the next character
+        if not peek:
             self.char_pos += 1
+
+        return char
+
+
+    def _expect_string(self, char):
+        """Expect String Token (Protected)
+
+        Parses the following characters in hope for a valid string.
+
+        Arguments:
+            char: The first character already picked for the value.
+
+        Returns:
+            (value, token_type) - A tuple describing the final parsed token.
+            The resulting token type will either be 'string' indicating a
+            valid string or 'error' indicating a non-recoverable error.
+        """
+        value = ''
+
+        # We know this is a string. Find the next quotation and return it
+        string_end = self.src[self.line_pos].find('\"', self.char_pos)
+
+        if string_end != -1:
+            value = self.src[self.line_pos][self.char_pos:string_end]
+
+            for i, char in enumerate(value):
+                if not char.isalnum() and char not in ' _,;:.\'':
+                    value = value.replace(char, ' ', 1)
+                    msg = 'Invalid character [{0}] in string'.format(char)
+                    self.print_msg(msg, prefix='Warning')
+                        
+            self.char_pos += len(value) + 1
+
+            return value, 'string'
+        else:
+            self.print_msg('No closing quotation in string')
+            return None, 'error'
+
+
+    def _expect_number(self, char):
+        """Expect Number Token (Protected)
+
+        Parses the following characters in hope of a valid int or float.
+
+        Arguments:
+            char: The first character already picked for the value.
+
+        Returns:
+            (value, token_type) - A tuple describing the final parsed token.
+            The resulting token type will either be 'int' indicating a valid
+            integer or 'float' indicating a valid floating point value.
+        """
+        value = '' + char
+        is_float = False
+        float_digits = 0
+
+        while True:
+            char = self._next_char(peek=True)
+
+            if char is None:
+                break
+            elif char == '.' and not is_float:
+                # We found a decimal point. Move to float mode
+                is_float = True
+                float_digits -= 1
+            elif not char.isdigit() and char != '_':
+                break
+
+            value += char
+            self.char_pos += 1
+
+            if is_float:
+                float_digits += 1
+
+        if not is_float:
+            type = 'int'
+        else:
+            type = 'float'
+
+            if float_digits == 0:
+                # We have a decimal point but nothing after. Throw a warning
+                msg = 'Digits missing after floating point decimal'
+                self.print_msg(msg, prefix='Warning')
+
+                # Fix this problem by assuming a 'x.0' floating point value
+                value += '0'
+
+        return value, type
+
+
+    def _expect_identifier(self, char):
+        """Expect Identifier Token (Protected)
+
+        Parses the following characters in hope of a valid identifier.
+
+        Arguments:
+            char: The first character already picked for the value.
+
+        Returns:
+            (value, token_type) - A tuple describing the final parsed token.
+            The resulting token type will either be 'identifier' indicating a
+            valid identifier or 'keyword' indicating a valid keyword.
+        """
+        value = '' + char
+
+        while True:
+            char = self._next_char(peek=True)
+
+            if char is None:
+                break
+            elif not char.isalnum() and char != '_':
+                break
+
+            # This is a valid character, commit to the value
+            value += char
+            self.char_pos += 1
+
+        # Determine if this is an identifier or a keyword
+        type = 'identifier'
+
+        if value in self.keywords:
+            type = 'keyword'
+
+        return value, type
+
+
+    def _expect_symbol(self, char):
+        """Expect Symbol Token (Protected)
+
+        Parses the following characters in hope of a valid symbol.
+
+        Arguments:
+            char: The first character already picked for the value.
+
+        Returns:
+            (value, token_type) - A tuple describing the final parsed token.
+            The resulting token type will either be 'symbol' indicating a
+            valid identifier or 'comment' indicating a comment until line end.
+        """
+        value = '' + char
         
-        return None
+        while True:
+            char = self._next_char(peek=True)
+
+            if char is None:
+                break
+            elif value + char == '//':
+                # Check to see if this is a comment, if it is go to next line
+                self._next_line()
+                return None, 'comment'
+            elif value + char not in self.symbols:
+                # This is not a symbol. Stop here
+                break
+            
+            # This is a valid character, commit to the value
+            value += char
+            self.char_pos += 1
+
+        return value, 'symbol' 
 

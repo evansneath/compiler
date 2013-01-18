@@ -39,11 +39,10 @@ def main():
 
     while True:
         token = scanner.next_token()
-
-        if token.type == 'eof':
-            break
-
         print(token)
+
+        if token.type in ['eof', 'error']:
+            break
 
     return True
 

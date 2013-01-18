@@ -1,12 +1,13 @@
-
-string first := "Hello world";
+??"Hello, this is a test"
+string first? := "Hello world";
 
  // This is a test comment.
 
-string my_str1ng := "This is a , T3St ; string float int";
+//string my_str1ng := "This is? a , T3St ;i&& string float int";
 int magic_number := 42;
 
-if (condition = "foo")
-    float camelCase1 := 1.3;
+if (condition = true or another = "some string") then
+    float ?camelCase1 := 1.;
+    float anotherFloat := 3.2;
 end
 
