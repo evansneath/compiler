@@ -1,13 +1,37 @@
-??"Hello, this is a test"
-string first? := "Hello world";
+//////////////////////////////////////////////////////////////////////////////
+// File:   testfile.src
+// Author: Evan Sneath
+//////////////////////////////////////////////////////////////////////////////
 
- // This is a test comment.
+// Test newline, space skipping, and comments
+  
 
-//string my_str1ng := "This is? a , T3St ;i&& string float int";
+// Tests keyword, symbol, identifier, and string
+string stringTest := "Hello world";
+
+// Test identifier with underscore and integer
 int magic_number := 42;
 
+// Test a complex line of keywords, strings, and identifiers
 if (condition = true or another = "some string") then
-    float ?camelCase1 := 1.;
+    // Test floating points
     float anotherFloat := 3.2;
+   
+    // Test alphanumeric identifiers and hanging float warning handling
+    // On the case of a hanging float (x.), a zero value (x.0) is assumed
+    float cam3l_Case1 := 1.;
+
+    // Test unknown character handling
+    bool foo#bar := true;
 end
 
+// Test a compact formed if statement
+if(foo=bar)then
+    do_something()
+end
+
+// Test warning handling of unknown characters in strings
+string bad_string := "Too# Many $trange characters here?"
+
+// Test hanging string error handling. This sends an irrecoverable error.
+string hanging_string := "This is a string that never ends.
