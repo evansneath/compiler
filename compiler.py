@@ -21,19 +21,17 @@ def main():
         True on success, False otherwise.
     """
     # Parse the command line arguments
-    parser = argparse.ArgumentParser(description='Compile source code')
+    parser = argparse.ArgumentParser()
     parser.add_argument('source',
-                        nargs=1,
-                        help='the source code to compile') 
+        help='the source code to compile') 
     parser.add_argument('target',
-                        nargs=1,
-                        help='the target location of the compiled source code')
+        help='the target location of the compiled source code')
     args = parser.parse_args()
 
     # Create a scanner object to parse the inputted source file
     scanner = Scanner()
 
-    if not scanner.attach_file(args.source[0]):
+    if not scanner.attach_file(args.source):
         print('Compilation failed')
         return False
 
