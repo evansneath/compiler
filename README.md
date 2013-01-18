@@ -31,13 +31,12 @@ To start the compiler, run:
 ```
 ./compiler.py <source> <target>
 ```
-Where `<source>` is the source file to compiler and `<target>` is the destination
+Where `<source>` is the source file to compile and `<target>` is the destination
 file for the intermediate code.
 <br/><br/>
-At the moment, the compiler will scan the source file for all valid tokens
-and any warnings or errors that may arrise. All valid tokens are printed as
-they are encountered.
+At the moment, the compiler will scan the source file for all valid tokens. All tokens are printed as
+they are encountered alongside any warnings or errors.
 <br/><br/>
-The `test` directory contains a test source file which has several examples of
+The `test/` directory contains a test source file which has several examples of
 token parsing and error/warning handling.
 
