@@ -15,10 +15,7 @@ from scanner import Scanner
 def main():
     """Main function
 
-    Oversees the execution of each stage of the compiler.
-
-    Returns:
-        True on success, False otherwise.
+    Oversees the execution of each component of the compiler.
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
@@ -32,9 +29,9 @@ def main():
     scanner = Scanner()
 
     if not scanner.attach_file(args.source):
-        print('Compilation failed')
-        return False
+        return
 
+    # Print every token until we hit the end of file or an error
     while True:
         token = scanner.next_token()
         print(token)
@@ -42,7 +39,7 @@ def main():
         if token.type in ['eof', 'error']:
             break
 
-    return True
+    return
 
 
 if __name__ == '__main__':
