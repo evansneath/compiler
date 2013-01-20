@@ -106,7 +106,7 @@ class Scanner(object):
         char = self.__next_word()
 
         if char is None:
-            return self.Token('eof', None, self.__line_pos+1)
+            return self.Token('eof', None, self.__line_pos)
 
         # Use the first character to choose the token type to expect
         if char == '\"':
@@ -119,7 +119,7 @@ class Scanner(object):
             value, token_type = self.__expect_symbol(char)
         else:
             # We've run across a character that shouldn't be here
-            msg = 'Invalid character [{0}] encountered'.format(char)
+            msg = 'Invalid character \'{0}\' encountered'.format(char)
             self._print_msg(msg, hl=self.__char_pos-1)
 
             # Run this function again until we find something good
