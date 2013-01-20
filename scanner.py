@@ -126,7 +126,8 @@ class Scanner(object):
             return self.next_token()
 
         if token_type == 'comment':
-            # If we find a comment, get the next token instead
+            # If we find a comment, get a token on the next line
+            self.__next_line()
             return self.next_token()
  
         # Build the new token object
@@ -248,14 +249,16 @@ class Scanner(object):
             valid string or 'error' indicating a non-recoverable error.
         """
         value = ''
+        hanging_quote = False
 
         # We know this is a string. Find the next quotation and return it
         string_end = self.__src[self.__line_pos].find('\"', self.__char_pos)
 
         # If we have a hanging quotation, assume quote ends at end of line
         if string_end == -1:
-            string_end = len(self.__src[self.__line_pos]) - 2
-            self._print_msg('No closing quotation in string', hl=string_end+1)
+            hanging_quote = True
+            string_end = len(self.__src[self.__line_pos]) - 1
+            self._print_msg('No closing quotation in string', hl=string_end)
 
         value = self.__src[self.__line_pos][self.__char_pos:string_end]
 
@@ -263,10 +266,12 @@ class Scanner(object):
         for i, char in enumerate(value):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
-                msg = 'Invalid character [{0}] in string'.format(char)
+                msg = 'Invalid character \'{0}\' in string'.format(char)
                 self._print_msg(msg, hl=self.__char_pos+i)
 
-        self.__char_pos += len(value) + 1
+        self.__char_pos += len(value)
+        if not hanging_quote:
+            self.__char_pos += 1
 
         return value, 'string'
 
@@ -368,8 +373,6 @@ class Scanner(object):
             if char is None:
                 break
             elif value + char == '//':
-                # Check to see if this is a comment, if it is go to next line
-                self.__next_line()
                 return None, 'comment'
             elif value + char not in self.__symbols:
                 break
