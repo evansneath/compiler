@@ -19,10 +19,8 @@ def main():
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('source',
-        help='the source code to compile') 
-    #parser.add_argument('target',
-    #    help='the target location of the compiled source code')
+    parser.add_argument('source', help='source code to compile')
+    #parser.add_argument('target', help='target path for the compiled code')
     args = parser.parse_args()
 
     # Create a scanner object to parse the inputted source file
