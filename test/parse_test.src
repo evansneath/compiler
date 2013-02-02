@@ -1,0 +1,7 @@
+// This is a test of the parsing component of the compiler.
+
+program test_program is
+
+begin
+
+end program

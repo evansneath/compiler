@@ -9,7 +9,7 @@ Author:     Evan Sneath
 import argparse
 
 # Import custom compiler libraries
-from scanner import Scanner
+from parser import Parser
 
 
 def main():
@@ -19,23 +19,15 @@ def main():
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('source', help='source code to compile')
     #parser.add_argument('target', help='target path for the compiled code')
+    parser.add_argument('source', nargs='+', help='source code to compile')
     args = parser.parse_args()
 
     # Create a scanner object to parse the inputted source file
-    scanner = Scanner()
+    parser = Parser()
 
-    if not scanner.attach_file(args.source):
-        return
-
-    # Print every token until we hit the end of file or an error
-    while True:
-        token = scanner.next_token()
-        print(token)
-
-        if token.type in ['eof', 'error']:
-            break
+    for file in args.source:
+        parser.parse(file)
 
     return
 

@@ -27,13 +27,15 @@ class Scanner(object):
     # Define an empty identifier (symbol) table for use in the scanner
     identifiers = {}
 
-    __keywords = [
-        'string', 'int', 'bool', 'float', 'global', 'in', 'out', 'if', 'then',
+    # Define all language keywords
+    keywords = [
+        'string', 'int', 'bool', 'float', 'global', 'is', 'in', 'out', 'if', 'then',
         'else', 'case', 'for', 'and', 'or', 'not', 'program', 'procedure',
         'begin', 'return', 'end', 'true', 'false',
     ]
 
-    __symbols = [
+    # Define all language symbols
+    symbols = [
         ':', ';', ',', '+', '-', '*', '/', '(', ')', '<', '<=', '>', '>=',
         '!=', '=', ':=', '{', '}',
     ]
@@ -43,7 +45,7 @@ class Scanner(object):
         super(Scanner, self).__init__()
 
         # Hold the file path of the attached source file
-        self.__src_path = ''
+        self._src_path = ''
 
         # Holds all source file data (code) to be scanned
         self.__src = ''
@@ -53,12 +55,28 @@ class Scanner(object):
         self.__char_pos = 0
 
         # Initialize the symbol table with each keyword
-        for keyword in self.__keywords:
+        for keyword in self.keywords:
             self.identifiers[keyword] = self.Token('keyword', keyword, None)
 
 
-    def attach_file(self, src_path):
-        """Attach file
+    def _get_line(self, line_number):
+        """Get Line (Protected)
+
+        Returns a line stripped of leading and trailing whitespace given a
+        line number.
+
+        Arguments:
+            line_number: The line number of the attached source file to print.
+
+        Returns:
+            The requested line number from the source, None on invalid line.
+        """
+        if line_number > 0 and line_number <= len(self.__src):
+            return self.__src[line_number-1].strip()
+
+
+    def _attach_file(self, src_path):
+        """Attach file (Protected)
 
         Attach a file to the scanner and prepare for token collection.
 
@@ -84,13 +102,13 @@ class Scanner(object):
             return False
 
         # The file was attached and read successfully, store the path
-        self.__src_path = src_path
+        self._src_path = src_path
 
         return True
 
 
-    def next_token(self):
-        """Scan For Next Token
+    def _next_token(self):
+        """Scan For Next Token (Protected)
 
         Scans the source code for the next token. The next token is then
         returned for parsing.
@@ -100,7 +118,7 @@ class Scanner(object):
             error.
         """
         # Store the token type as it is discovered
-        token_type = 'unknown'
+        token_type = ''
 
         # Get the first character, narrow down the data type possiblilites
         char = self.__next_word()
@@ -115,20 +133,20 @@ class Scanner(object):
             value, token_type = self.__expect_number(char)
         elif char.isalpha():
             value, token_type = self.__expect_identifier(char)
-        elif char in self.__symbols:
+        elif char in self.symbols:
             value, token_type = self.__expect_symbol(char)
         else:
             # We've run across a character that shouldn't be here
             msg = 'Invalid character \'{0}\' encountered'.format(char)
-            self._print_msg(msg, hl=self.__char_pos-1)
+            self._scan_msg(msg, hl=self.__char_pos-1)
 
             # Run this function again until we find something good
-            return self.next_token()
+            return self._next_token()
 
         if token_type == 'comment':
             # If we find a comment, get a token on the next line
             self.__next_line()
-            return self.next_token()
+            return self._next_token()
  
         # Build the new token object
         new_token = self.Token(token_type, value, self.__line_pos+1)
@@ -140,7 +158,7 @@ class Scanner(object):
         return new_token
 
 
-    def _print_msg(self, msg, prefix='Warning', hl=-1):
+    def _scan_msg(self, msg, prefix='Warning', hl=-1):
         """Print Scanner Message (Protected)
 
         Prints a formatted message. Used for errors, warnings, or info.
@@ -154,7 +172,7 @@ class Scanner(object):
         line = self.__src[self.__line_pos][0:-1]
 
         print(prefix.title(), ': ', sep='', end='')
-        print('\"{0}\", line {1}'.format(self.__src_path, self.__line_pos+1))
+        print('\"{0}\", line {1}'.format(self._src_path, self.__line_pos+1))
         print('    ', msg, '\n    ', line.strip(), sep='')
 
         if hl != -1:
@@ -258,7 +276,7 @@ class Scanner(object):
         if string_end == -1:
             hanging_quote = True
             string_end = len(self.__src[self.__line_pos]) - 1
-            self._print_msg('No closing quotation in string', hl=string_end)
+            self._scan_msg('No closing quotation in string', hl=string_end)
 
         value = self.__src[self.__line_pos][self.__char_pos:string_end]
 
@@ -267,7 +285,7 @@ class Scanner(object):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
                 msg = 'Invalid character \'{0}\' in string'.format(char)
-                self._print_msg(msg, hl=self.__char_pos+i)
+                self._scan_msg(msg, hl=self.__char_pos+i)
 
         self.__char_pos += len(value)
         if not hanging_quote:
@@ -346,7 +364,7 @@ class Scanner(object):
             value += char
             self.__char_pos += 1
 
-        if value in self.__keywords:
+        if value in self.keywords:
             token_type = 'keyword'
 
         return value, token_type
@@ -374,7 +392,7 @@ class Scanner(object):
                 break
             elif value + char == '//':
                 return None, 'comment'
-            elif value + char not in self.__symbols:
+            elif value + char not in self.symbols:
                 break
             
             value += char
