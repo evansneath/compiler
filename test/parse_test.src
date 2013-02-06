@@ -2,6 +2,13 @@
 
 program test_program is
 
+    procedure test()
+    begin
+        two_param := "Hello, World";
+    end procedure;
+
+    integer local_int;
+
 begin
 
 end program

@@ -29,7 +29,7 @@ class Scanner(object):
 
     # Define all language keywords
     keywords = [
-        'string', 'int', 'bool', 'float', 'global', 'is', 'in', 'out', 'if', 'then',
+        'string', 'integer', 'bool', 'float', 'global', 'is', 'in', 'out', 'if', 'then',
         'else', 'case', 'for', 'and', 'or', 'not', 'program', 'procedure',
         'begin', 'return', 'end', 'true', 'false',
     ]
@@ -37,7 +37,7 @@ class Scanner(object):
     # Define all language symbols
     symbols = [
         ':', ';', ',', '+', '-', '*', '/', '(', ')', '<', '<=', '>', '>=',
-        '!=', '=', ':=', '{', '}',
+        '!=', '=', ':=', '{', '}', '[', ']',
     ]
 
 
@@ -297,7 +297,7 @@ class Scanner(object):
     def __expect_number(self, char):
         """Expect Number Token (Private)
 
-        Parses the following characters in hope of a valid int or float.
+        Parses the following characters in hope of a valid integer or float.
 
         Arguments:
             char: The first character already picked for the value.
@@ -308,7 +308,7 @@ class Scanner(object):
             integer or 'float' indicating a valid floating point value.
         """
         value = '' + char
-        token_type = 'int'
+        token_type = 'integer'
 
         is_float = False
 
