@@ -1,0 +1,28 @@
+//////////////////////////////////////////////////////////////////////////////
+// File:   parser_test.src
+// Author: Evan Sneath
+//////////////////////////////////////////////////////////////////////////////
+
+// This is a test of the parsing component of the compiler.
+
+program test_program is
+
+    procedure test()
+        string two_param;
+    begin
+        two_param := "Hello, World";
+    end procedure;
+
+    integer test_int;
+    integer another_int;
+
+begin
+
+
+    test_int := 1234;
+    another_int := 5678;
+
+    // TODO: This breaks things. Recursive calls to __consume_term
+    //test_int := another_int + test_int;
+
+end program

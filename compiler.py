@@ -20,14 +20,16 @@ def main():
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
     #parser.add_argument('target', help='target path for the compiled code')
-    parser.add_argument('source', nargs='+', help='source code to compile')
+    parser.add_argument('source', help='source code to compile')
     args = parser.parse_args()
 
-    # Create a scanner object to parse the inputted source file
-    parser = Parser()
+    # Create a Parser object to parse the inputted source file
+    parser = Parser(debug=True)
 
-    for file in args.source:
-        parser.parse(file)
+    if parser.parse(args.source):
+        print('Successfully parsed', args.source)
+    else:
+        print('Error encountered while parsing', args.source)
 
     return
 
