@@ -26,7 +26,6 @@ class Parser(Scanner):
     Parses the given source file using the defined language structure.
 
     Attributes:
-        token: The current token which is being parsed.
         debug: Boolean attribute denoting if successfully parsed tokens should
             be displayed as they are encountered and parsed.
     """
@@ -37,8 +36,8 @@ class Parser(Scanner):
         self.debug = debug
 
         # Define the current and future token holders
-        self.current = None
-        self.future = None
+        self.__current = None
+        self.__future = None
 
         return
 
@@ -56,19 +55,19 @@ class Parser(Scanner):
         self.attach_file(src_path)
 
         # Advance the tokens twice to populate both current and future tokens
-        self.advance_token()
-        self.advance_token()
+        self.__advance_token()
+        self.__advance_token()
 
         # Begin parsing the <program> structure
         try:
-            self.parse_program()
+            self.__parse_program()
         except ParsingError as e:
             return False
 
         return True
 
-    def error(self, expected):
-        """Print Parser Error Message
+    def __error(self, expected):
+        """Print Parser Error Message (Private)
 
         Prints a parser error message with details about the expected token
         and the current token being parsed.
@@ -76,7 +75,7 @@ class Parser(Scanner):
         Arguments:
             expected: A string containing the expected token type/value.
         """
-        token = self.current
+        token = self.__current
 
         print('Error: "{0}", line {1}'.format(self._src_path, token.line))
         print('    Expected {0}, '.format(expected), end='')
@@ -88,21 +87,21 @@ class Parser(Scanner):
 
         return
 
-    def advance_token(self):
-        """Advance Tokens
+    def __advance_token(self):
+        """Advance Tokens (Private)
 
         Populates the 'current' token with the 'future' token and populates
         the 'future' token with the next token in the source file.
         """
-        self.current = self.future
+        self.__current = self.__future
 
-        if self.future is None or self.future.type not in ['eof', 'error']:
-            self.future = self.next_token()
+        if self.__future is None or self.__future.type != 'eof':
+            self.__future = self.next_token()
 
         return
 
-    def check(self, type, value=None, future=False):
-        """Check Token
+    def __check(self, type, value=None, future=False):
+        """Check Token (Private)
 
         Peeks at the token to see if the current token matches the given
         type and value. If it doesn't, don't make a big deal about it.
@@ -115,15 +114,15 @@ class Parser(Scanner):
         Returns:
             True if the token matches the expected value, False otherwise.
         """
-        token = self.current
+        token = self.__current
 
         if future:
-            token = self.future
+            token = self.__future
 
         return token.type == type and (token.value == value or value is None)
 
-    def accept(self, type, value=None):
-        """Accept Token
+    def __accept(self, type, value=None):
+        """Accept Token (Private)
 
         Compares the token to an expected type and value. If it matches, then
         consume the token. If not, don't make a big deal about it.
@@ -135,17 +134,17 @@ class Parser(Scanner):
         Returns:
             True if the token matches the expected value, False otherwise.
         """
-        if self.check(type, value):
+        if self.__check(type, value):
             if self.debug:
-                print('>>> Consuming:', self.current)
+                print('>>> Consuming:', self.__current)
 
-            self.advance_token()
+            self.__advance_token()
             return True
 
         return False
 
-    def match(self, type, value=None):
-        """Match Token
+    def __match(self, type, value=None):
+        """Match Token (Private)
 
         Compares the token to an expected type and value. If it matches, then
         consume the token. If not, then throw an error and panic.
@@ -158,46 +157,46 @@ class Parser(Scanner):
             True if the token matches the expected value, False otherwise.
         """
         # Check the type, if we specified debug, print everything matchd
-        if self.accept(type, value):
+        if self.__accept(type, value):
             return True
 
         # Something different than expected was encountered
         if type in ['identifier', 'integer', 'float', 'string']:
-            self.error(type)
+            self.__error(type)
         else:
-            self.error('"'+value+'"')
+            self.__error('"'+value+'"')
 
         return False
 
-    def parse_program(self):
-        """<program>
+    def __parse_program(self):
+        """<program> (Private)
 
         Parses the <program> language structure.
 
             <program> ::=
                 <program_header> <program_body>
         """
-        self.parse_program_header()
-        self.parse_program_body()
+        self.__parse_program_header()
+        self.__parse_program_body()
 
         return
 
-    def parse_program_header(self):
-        """<program_header>
+    def __parse_program_header(self):
+        """<program_header> (Private)
 
         Parses the <program_header> language structure.
 
             <program_header> ::=
                 'program' <identifier> 'is'
         """
-        self.match('keyword', 'program')
-        self.match('identifier')
-        self.match('keyword', 'is')
+        self.__match('keyword', 'program')
+        self.__match('identifier')
+        self.__match('keyword', 'is')
 
         return
 
-    def parse_program_body(self):
-        """<program_body>
+    def __parse_program_body(self):
+        """<program_body> (Private)
 
         Parses the <program_body> language structure.
 
@@ -207,20 +206,20 @@ class Parser(Scanner):
                     ( <statement> ';' )*
                 'end' 'program'
         """
-        while not self.accept('keyword', 'begin'):
-            self.parse_declaration()
-            self.match('symbol', ';')
+        while not self.__accept('keyword', 'begin'):
+            self.__parse_declaration()
+            self.__match('symbol', ';')
 
-        while not self.accept('keyword', 'end'):
-            self.parse_statement()
-            self.match('symbol', ';')
+        while not self.__accept('keyword', 'end'):
+            self.__parse_statement()
+            self.__match('symbol', ';')
 
-        self.match('keyword', 'program')
+        self.__match('keyword', 'program')
 
         return
 
-    def parse_declaration(self):
-        """<declaration>
+    def __parse_declaration(self):
+        """<declaration> (Private)
 
         Parses the <declaration> language structure.
 
@@ -228,20 +227,20 @@ class Parser(Scanner):
                 [ 'global' ] <procedure_declaration>
                 [ 'global' ] <variable_declaration>
         """
-        if self.accept('keyword', 'global'):
+        if self.__accept('keyword', 'global'):
             pass
 
-        if self.first_procedure_declaration():
-            self.parse_procedure_declaration()
-        elif self.first_variable_declaration():
-            self.parse_variable_declaration()
+        if self.__first_procedure_declaration():
+            self.__parse_procedure_declaration()
+        elif self.__first_variable_declaration():
+            self.__parse_variable_declaration()
         else:
-            self.error('declaration')
+            self.__error('declaration')
 
         return
 
-    def first_variable_declaration(self):
-        """first(<variable_declaration>)
+    def __first_variable_declaration(self):
+        """first(<variable_declaration>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -251,41 +250,41 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return (self.check('keyword', 'integer') or
-                self.check('keyword', 'float') or
-                self.check('keyword', 'bool') or
-                self.check('keyword', 'string'))
+        return (self.__check('keyword', 'integer') or
+                self.__check('keyword', 'float') or
+                self.__check('keyword', 'bool') or
+                self.__check('keyword', 'string'))
 
-    def parse_variable_declaration(self):
-        """<variable_declaration>
+    def __parse_variable_declaration(self):
+        """<variable_declaration> (Private)
 
         Parses the <variable_declaration> language structure.
 
             <variable_declaration> ::=
                 <type_mark> <identifier> [ '[' <array_size> ']' ]
         """
-        if self.accept('keyword', 'integer'):
+        if self.__accept('keyword', 'integer'):
             pass
-        elif self.accept('keyword', 'float'):
+        elif self.__accept('keyword', 'float'):
             pass
-        elif self.accept('keyword', 'bool'):
+        elif self.__accept('keyword', 'bool'):
             pass
-        elif self.accept('keyword', 'string'):
+        elif self.__accept('keyword', 'string'):
             pass
         else:
-            self.error('variable declaration')
+            self.__error('variable declaration')
             return
 
-        self.match('identifier')
+        self.__match('identifier')
 
-        if self.accept('symbol', '['):
-            self.parse_number()
-            self.match('symbol', ']')
+        if self.__accept('symbol', '['):
+            self.__parse_number()
+            self.__match('symbol', ']')
 
         return
 
-    def first_procedure_declaration(self):
-        """first(<procedure_declarations>)
+    def __first_procedure_declaration(self):
+        """first(<procedure_declarations>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -295,42 +294,42 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('keyword', 'procedure')
+        return self.__check('keyword', 'procedure')
 
-    def parse_procedure_declaration(self):
-        """<procedure_declaration>
+    def __parse_procedure_declaration(self):
+        """<procedure_declaration> (Private)
 
         Parses the <procedure_declaration> language structure.
 
             <procedure_declaration> ::=
                 <procedure_header> <procedure_body>
         """
-        self.parse_procedure_header()
-        self.parse_procedure_body()
+        self.__parse_procedure_header()
+        self.__parse_procedure_body()
 
         return
 
-    def parse_procedure_header(self):
-        """<procedure_header>
+    def __parse_procedure_header(self):
+        """<procedure_header> (Private)
 
         Parses the <procedure_header> language structure.
 
             <procedure_header> ::=
                 'procedure' <identifier> '(' [ <parameter_list> ] ')'
         """
-        self.match('keyword', 'procedure')
-        self.match('identifier')
-        self.match('symbol', '(')
+        self.__match('keyword', 'procedure')
+        self.__match('identifier')
+        self.__match('symbol', '(')
 
-        if not self.check('symbol', ')'):
-            self.parse_parameter_list()
+        if not self.__check('symbol', ')'):
+            self.__parse_parameter_list()
 
-        self.match('symbol', ')')
+        self.__match('symbol', ')')
 
         return
 
-    def parse_procedure_body(self):
-        """<procedure_body>
+    def __parse_procedure_body(self):
+        """<procedure_body> (Private)
 
         Parses the <procedure_body> language structure.
 
@@ -340,20 +339,20 @@ class Parser(Scanner):
                     ( <statement> ';' )*
                 'end' 'procedure'
         """
-        while not self.accept('keyword', 'begin'):
-            self.parse_declaration()
-            self.match('symbol', ';')
+        while not self.__accept('keyword', 'begin'):
+            self.__parse_declaration()
+            self.__match('symbol', ';')
 
-        while not self.accept('keyword', 'end'):
-            self.parse_statement()
-            self.match('symbol', ';')
+        while not self.__accept('keyword', 'end'):
+            self.__parse_statement()
+            self.__match('symbol', ';')
 
-        self.match('keyword', 'procedure')
+        self.__match('keyword', 'procedure')
 
         return
 
-    def parse_parameter_list(self):
-        """<parameter_list>
+    def __parse_parameter_list(self):
+        """<parameter_list> (Private)
 
         Parse the <parameter_list> language structure.
 
@@ -361,34 +360,34 @@ class Parser(Scanner):
                 <parameter> ',' <parameter_list> |
                 <parameter>
         """
-        self.parse_parameter()
+        self.__parse_parameter()
 
-        if self.accept('symbol', ','):
-            self.parse_parameter_list()
+        if self.__accept('symbol', ','):
+            self.__parse_parameter_list()
 
         return
 
-    def parse_parameter(self):
-        """<parameter>
+    def __parse_parameter(self):
+        """<parameter> (Private)
 
         Parse the <parameter> language structure.
 
             <parameter> ::=
                 <variable_declaration> ( 'in' | 'out' )
         """
-        self.parse_variable_declaration()
+        self.__parse_variable_declaration()
 
-        if self.accept('keyword', 'in'):
+        if self.__accept('keyword', 'in'):
             pass
-        elif self.accept('keyword', 'out'):
+        elif self.__accept('keyword', 'out'):
             pass
         else:
-            self.error('\"in\" or \"out\"')
+            self.__error('\"in\" or \"out\"')
 
         return
 
-    def parse_statement(self):
-        """<statement>
+    def __parse_statement(self):
+        """<statement> (Private)
 
         Parse the <statement> language structure.
 
@@ -399,23 +398,23 @@ class Parser(Scanner):
                 <return_statement> |
                 <procedure_call>
         """
-        if self.accept('keyword', 'return'):
+        if self.__accept('keyword', 'return'):
             pass
-        elif self.first_if_statement():
-            self.parse_if_statement()
-        elif self.first_loop_statement():
-            self.parse_loop_statement()
-        elif self.first_procedure_call():
-            self.parse_procedure_call()
-        elif self.first_assignment_statement():
-            self.parse_assignment_statement()
+        elif self.__first_if_statement():
+            self.__parse_if_statement()
+        elif self.__first_loop_statement():
+            self.__parse_loop_statement()
+        elif self.__first_procedure_call():
+            self.__parse_procedure_call()
+        elif self.__first_assignment_statement():
+            self.__parse_assignment_statement()
         else:
-            self.error('statement')
+            self.__error('statement')
 
         return
 
-    def first_assignment_statement(self):
-        """first(<assignment_statement>)
+    def __first_assignment_statement(self):
+        """first(<assignment_statement>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -425,24 +424,24 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('identifier')
+        return self.__check('identifier')
 
-    def parse_assignment_statement(self):
-        """<assignment_statement>
+    def __parse_assignment_statement(self):
+        """<assignment_statement> (Private)
 
         Parses the <assignment_statement> language structure.
 
             <assignment_statement> ::=
                 <destination> ':=' <expression>
         """
-        self.parse_destination()
-        self.match('symbol', ':=')
-        self.parse_expression()
+        self.__parse_destination()
+        self.__match('symbol', ':=')
+        self.__parse_expression()
 
         return
 
-    def first_if_statement(self):
-        """first(<if_statement>)
+    def __first_if_statement(self):
+        """first(<if_statement>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -452,10 +451,10 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('keyword', 'if')
+        return self.__check('keyword', 'if')
 
-    def parse_if_statement(self):
-        """<if_statement>
+    def __parse_if_statement(self):
+        """<if_statement> (Private)
 
         Parses the <if_statement> language structure.
 
@@ -464,36 +463,37 @@ class Parser(Scanner):
                 [ 'else' ( <statement> ';' )+ ]
                 'end' 'if'
         """
-        self.match('keyword', 'if')
-        self.match('symbol', '(')
+        self.__match('keyword', 'if')
+        self.__match('symbol', '(')
 
-        self.parse_expression()
+        self.__parse_expression()
 
-        self.match('symbol', ')')
-        self.match('keyword', 'then')
+        self.__match('symbol', ')')
+        self.__match('keyword', 'then')
 
         while True:
-            self.parse_statement()
-            self.match('symbol', ';')
+            self.__parse_statement()
+            self.__match('symbol', ';')
 
-            if self.check('keyword', 'else') or self.check('keyword', 'end'):
+            if (self.__check('keyword', 'else') or
+                    self.__check('keyword', 'end')):
                 break
 
-        if self.accept('keyword', 'else'):
+        if self.__accept('keyword', 'else'):
             while True:
-                self.parse_statement()
-                self.match('symbol', ';')
+                self.__parse_statement()
+                self.__match('symbol', ';')
 
-                if self.check('keyword', 'end'):
+                if self.__check('keyword', 'end'):
                     break
 
-        self.match('keyword', 'end')
-        self.match('keyword', 'if')
+        self.__match('keyword', 'end')
+        self.__match('keyword', 'if')
 
         return
 
-    def first_loop_statement(self):
-        """first(<loop_statement>)
+    def __first_loop_statement(self):
+        """first(<loop_statement>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -503,10 +503,10 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('keyword', 'for')
+        return self.__check('keyword', 'for')
 
-    def parse_loop_statement(self):
-        """<loop_statement>
+    def __parse_loop_statement(self):
+        """<loop_statement> (Private)
 
         Parses the <loop_statement> language structure.
 
@@ -515,23 +515,23 @@ class Parser(Scanner):
                     ( <statement> ';' )*
                 'end' 'for'
         """
-        self.match('keyword', 'for')
-        self.match('symbol', '(')
-        self.parse_assignment_statement()
-        self.match('symbol', ';')
-        self.parse_expression()
-        self.match('symbol', ')')
+        self.__match('keyword', 'for')
+        self.__match('symbol', '(')
+        self.__parse_assignment_statement()
+        self.__match('symbol', ';')
+        self.__parse_expression()
+        self.__match('symbol', ')')
 
-        while not self.accept('keyword', 'end'):
-            self.parse_statement()
-            self.match('symbol', ';')
+        while not self.__accept('keyword', 'end'):
+            self.__parse_statement()
+            self.__match('symbol', ';')
 
-        self.match('keyword', 'for')
+        self.__match('keyword', 'for')
 
         return
 
-    def first_procedure_call(self):
-        """first(<procedure_call>)
+    def __first_procedure_call(self):
+        """first(<procedure_call>) (Private)
 
         Determines if current token matches the first terminals. The second
         terminal is checked using the future token in this case to distinguish
@@ -543,28 +543,28 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('symbol', '(', future=True)
+        return self.__check('symbol', '(', future=True)
 
-    def parse_procedure_call(self):
-        """<procedure_call>
+    def __parse_procedure_call(self):
+        """<procedure_call> (Private)
 
         Parses the <procedure_call> language structure.
 
             <procedure_call> ::=
                 <identifier> '(' [ <argument_list> ] ')'
         """
-        self.match('identifier')
-        self.match('symbol', '(')
+        self.__match('identifier')
+        self.__match('symbol', '(')
 
-        if not self.check('symbol', ')'):
-            self.parse_argument_list()
+        if not self.__check('symbol', ')'):
+            self.__parse_argument_list()
 
-        self.match('symbol', ')')
+        self.__match('symbol', ')')
 
         return
 
-    def parse_argument_list(self):
-        """<argument_list>
+    def __parse_argument_list(self):
+        """<argument_list> (Private)
 
         Parses <argument_list> language structure.
 
@@ -572,31 +572,31 @@ class Parser(Scanner):
                 <expression> ',' <argument_list> |
                 <expression>
         """
-        self.parse_expression()
+        self.__parse_expression()
 
-        if self.accept('symbol', ','):
-            self.parse_argument_list()
+        if self.__accept('symbol', ','):
+            self.__parse_argument_list()
 
         return
 
-    def parse_destination(self):
-        """<destination>
+    def __parse_destination(self):
+        """<destination> (Private)
 
         Parses the <destination> language structure.
 
             <destination> ::=
                 <identifier> [ '[' <expression> ']' ]
         """
-        self.match('identifier')
+        self.__match('identifier')
 
-        if self.accept('symbol', '['):
-            self.parse_expression()
-            self.accept('symbol', ']')
+        if self.__accept('symbol', '['):
+            self.__parse_expression()
+            self.__accept('symbol', ']')
 
         return
 
-    def parse_expression(self):
-        """<expression>
+    def __parse_expression(self):
+        """<expression> (Private)
 
         Parses <expression> language structure.
 
@@ -605,23 +605,23 @@ class Parser(Scanner):
                 <expression> '|' <arith_op> |
                 [ 'not' ] <arith_op>
         """
-        if self.accept('keyword', 'not'):
+        if self.__accept('keyword', 'not'):
             pass
 
-        self.parse_arith_op()
+        self.__parse_arith_op()
 
         while True:
-            if self.accept('symbol', '&'):
-                self.parse_arith_op()
-            elif self.accept('symbol', '|'):
-                self.parse_arith_op()
+            if self.__accept('symbol', '&'):
+                self.__parse_arith_op()
+            elif self.__accept('symbol', '|'):
+                self.__parse_arith_op()
             else:
                 break
 
         return
 
-    def parse_arith_op(self):
-        """<arith_op>
+    def __parse_arith_op(self):
+        """<arith_op> (Private)
 
         Parses <arith_op> language structure.
 
@@ -630,20 +630,20 @@ class Parser(Scanner):
                 <arith_op> '-' <relation> |
                 <relation>
         """
-        self.parse_relation()
+        self.__parse_relation()
 
         while True:
-            if self.accept('symbol', '+'):
-                self.parse_relation()
-            elif self.accept('symbol', '-'):
-                self.parse_relation()
+            if self.__accept('symbol', '+'):
+                self.__parse_relation()
+            elif self.__accept('symbol', '-'):
+                self.__parse_relation()
             else:
                 break
 
         return
 
-    def parse_relation(self):
-        """<relation>
+    def __parse_relation(self):
+        """<relation> (Private)
 
         Parses <relation> language structure.
 
@@ -656,28 +656,28 @@ class Parser(Scanner):
                 <relation> '!=' <term> |
                 <term>
         """
-        self.parse_term()
+        self.__parse_term()
 
         while True:
-            if self.accept('symbol', '<'):
-                self.parse_term()
-            elif self.accept('symbol', '>'):
-                self.parse_term()
-            elif self.accept('symbol', '<='):
-                self.parse_term()
-            elif self.accept('symbol', '>='):
-                self.parse_term()
-            elif self.accept('symbol', '=='):
-                self.parse_term()
-            elif self.accept('symbol', '!='):
-                self.parse_term()
+            if self.__accept('symbol', '<'):
+                self.__parse_term()
+            elif self.__accept('symbol', '>'):
+                self.__parse_term()
+            elif self.__accept('symbol', '<='):
+                self.__parse_term()
+            elif self.__accept('symbol', '>='):
+                self.__parse_term()
+            elif self.__accept('symbol', '=='):
+                self.__parse_term()
+            elif self.__accept('symbol', '!='):
+                self.__parse_term()
             else:
                 break
 
         return
 
-    def parse_term(self):
-        """<term>
+    def __parse_term(self):
+        """<term> (Private)
 
         Parses <term> language structure.
 
@@ -686,20 +686,20 @@ class Parser(Scanner):
                 <term> '/' <factor> |
                 <factor>
         """
-        self.parse_factor()
+        self.__parse_factor()
 
         while True:
-            if self.accept('symbol', '*'):
-                self.parse_factor()
-            elif self.accept('symbol', '/'):
-                self.parse_factor()
+            if self.__accept('symbol', '*'):
+                self.__parse_factor()
+            elif self.__accept('symbol', '/'):
+                self.__parse_factor()
             else:
                 break
 
         return
 
-    def parse_factor(self):
-        """<factor>
+    def __parse_factor(self):
+        """<factor> (Private)
 
         Parses <factor> language structure.
 
@@ -711,33 +711,33 @@ class Parser(Scanner):
                 'true' |
                 'false'
         """
-        if self.accept('symbol', '('):
-            self.parse_expression()
-            self.match('symbol', ')')
-        elif self.accept('string'):
+        if self.__accept('symbol', '('):
+            self.__parse_expression()
+            self.__match('symbol', ')')
+        elif self.__accept('string'):
             pass
-        elif self.accept('keyword', 'true'):
+        elif self.__accept('keyword', 'true'):
             pass
-        elif self.accept('keyword', 'false'):
+        elif self.__accept('keyword', 'false'):
             pass
-        elif self.accept('symbol', '-'):
-            if self.first_name():
-                self.parse_name()
-            elif self.check('integer') or self.check('float'):
-                self.parse_number()
+        elif self.__accept('symbol', '-'):
+            if self.__first_name():
+                self.__parse_name()
+            elif self.__check('integer') or self.__check('float'):
+                self.__parse_number()
             else:
-                self.error('name or number')
-        elif self.first_name():
-            self.parse_name()
-        elif self.check('integer') or self.check('float'):
-            self.parse_number()
+                self.__error('name or number')
+        elif self.__first_name():
+            self.__parse_name()
+        elif self.__check('integer') or self.__check('float'):
+            self.__parse_number()
         else:
-            self.error('factor')
+            self.__error('factor')
 
         return
 
-    def first_name(self):
-        """first(<name>)
+    def __first_name(self):
+        """first(<name>) (Private)
 
         Determines if current token matches the first terminals.
 
@@ -747,37 +747,37 @@ class Parser(Scanner):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self.check('identifier')
+        return self.__check('identifier')
 
-    def parse_name(self):
-        """<name>
+    def __parse_name(self):
+        """<name> (Private)
 
         Parses <name> language structure.
 
             <name> ::=
                 <identifier> [ '[' <expression> ']' ]
         """
-        self.match('identifier')
+        self.__match('identifier')
 
-        if self.accept('symbol', '['):
-            self.parse_expression()
-            self.match('symbol', ']')
+        if self.__accept('symbol', '['):
+            self.__parse_expression()
+            self.__match('symbol', ']')
 
         return
 
-    def parse_number(self):
-        """Parse Number
+    def __parse_number(self):
+        """Parse Number (Private)
 
         Parses the <number> language structure.
 
             <number> ::=
                 [0-9][0-9_]*[.[0-9_]*]
         """
-        if self.accept('integer'):
+        if self.__accept('integer'):
             pass
-        elif self.accept('float'):
+        elif self.__accept('float'):
             pass
         else:
-            self.error('number')
+            self.__error('number')
 
         return

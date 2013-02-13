@@ -94,8 +94,7 @@ class Scanner(object):
         returned for parsing.
 
         Returns:
-            The next token object in the source code. None on irrecoverable
-            error.
+            The next token object in the source code.
         """
         # Store the token type as it is discovered
         token_type = ''
@@ -153,12 +152,12 @@ class Scanner(object):
             return self.__src[line_number-1].strip()
 
     def __warning(self, msg, hl=-1):
-        """Print Scanner Message (Protected)
+        """Print Scanner Warning Message (Protected)
 
-        Prints a formatted message. Used for errors, warnings, or info.
+        Prints a formatted warning message.
 
         Arguments:
-            msg: The main message to display
+            msg: The warning message to display
             hl: If not -1, there will be an pointer (^) under a
                 character in the line to be highlighted.
         """
@@ -248,12 +247,12 @@ class Scanner(object):
     def __expect_string(self):
         """Expect String Token (Private)
 
-        Parses the following characters in hope of a valid string.
+        Parses the following characters in hope of a valid string. If an
+        invalid string is encountered, all attempts are made to make it valid.
 
         Returns:
             (value, token_type) - A tuple describing the final parsed token.
-            The resulting token type will either be 'string' indicating a
-            valid string or 'error' indicating a non-recoverable error.
+            The resulting token type will be 'string'.
         """
         value = ''
         hanging_quote = False
