@@ -24,12 +24,12 @@ def main():
     args = parser.parse_args()
 
     # Create a Parser object to parse the inputted source file
-    parser = Parser(debug=True)
+    parser = Parser(debug=False)
 
     if parser.parse(args.source):
         print('Successfully parsed', args.source)
     else:
-        print('Error encountered while parsing', args.source)
+        print('Error while parsing', args.source)
 
     return
 

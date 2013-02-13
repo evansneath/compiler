@@ -15,6 +15,7 @@ program test_program is
 
     integer test_int;
     integer another_int;
+    integer hello;
 
 begin
 
