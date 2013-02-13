@@ -9,6 +9,10 @@ from collections import namedtuple
 import os
 
 
+# Create a named tuple object factory for tokens
+Token = namedtuple('Token', ['type', 'value', 'line'])
+
+
 class Scanner(object):
     """Scanner class
 
@@ -16,30 +20,24 @@ class Scanner(object):
     compilation process.
 
     Attributes:
-        Token: A token named tuple class factory (type, value, line)
         identifiers: A identifiers (symbol) table. All identifiers are stored
             in the dictionary with the identifier name as the key.
     """
-
-    # Create a named tuple object factory for tokens
-    Token = namedtuple('Token', ['type', 'value', 'line'])
-
     # Define an empty identifier (symbol) table for use in the scanner
     identifiers = {}
 
     # Define all language keywords
     keywords = [
-        'string', 'integer', 'bool', 'float', 'global', 'is', 'in', 'out', 'if', 'then',
-        'else', 'case', 'for', 'and', 'or', 'not', 'program', 'procedure',
-        'begin', 'return', 'end', 'true', 'false',
+        'string', 'integer', 'bool', 'float', 'global', 'is', 'in', 'out',
+        'if', 'then', 'else', 'for', 'and', 'or', 'not', 'program',
+        'procedure', 'begin', 'return', 'end', 'true', 'false',
     ]
 
     # Define all language symbols
     symbols = [
         ':', ';', ',', '+', '-', '*', '/', '(', ')', '<', '<=', '>', '>=',
-        '!=', '=', ':=', '{', '}', '[', ']',
+        '!=', '==', ':=', '[', ']', '&', '|',
     ]
-
 
     def __init__(self):
         super(Scanner, self).__init__()
@@ -56,27 +54,10 @@ class Scanner(object):
 
         # Initialize the symbol table with each keyword
         for keyword in self.keywords:
-            self.identifiers[keyword] = self.Token('keyword', keyword, None)
+            self.identifiers[keyword] = Token('keyword', keyword, None)
 
-
-    def _get_line(self, line_number):
-        """Get Line (Protected)
-
-        Returns a line stripped of leading and trailing whitespace given a
-        line number.
-
-        Arguments:
-            line_number: The line number of the attached source file to print.
-
-        Returns:
-            The requested line number from the source, None on invalid line.
-        """
-        if line_number > 0 and line_number <= len(self.__src):
-            return self.__src[line_number-1].strip()
-
-
-    def _attach_file(self, src_path):
-        """Attach file (Protected)
+    def attach_file(self, src_path):
+        """Attach file
 
         Attach a file to the scanner and prepare for token collection.
 
@@ -106,9 +87,8 @@ class Scanner(object):
 
         return True
 
-
-    def _next_token(self):
-        """Scan For Next Token (Protected)
+    def next_token(self):
+        """Scan For Next Token
 
         Scans the source code for the next token. The next token is then
         returned for parsing.
@@ -124,7 +104,7 @@ class Scanner(object):
         char = self.__next_word()
 
         if char is None:
-            return self.Token('eof', None, self.__line_pos)
+            return Token('eof', None, self.__line_pos)
 
         # Use the first character to choose the token type to expect
         if char == '\"':
@@ -138,41 +118,54 @@ class Scanner(object):
         else:
             # We've run across a character that shouldn't be here
             msg = 'Invalid character \'{0}\' encountered'.format(char)
-            self._scan_msg(msg, hl=self.__char_pos-1)
+            self.__warning(msg, hl=self.__char_pos-1)
 
             # Run this function again until we find something good
-            return self._next_token()
+            return self.next_token()
 
         if token_type == 'comment':
             # If we find a comment, get a token on the next line
             self.__next_line()
-            return self._next_token()
- 
+            return self.next_token()
+
         # Build the new token object
-        new_token = self.Token(token_type, value, self.__line_pos+1)
+        new_token = Token(token_type, value, self.__line_pos+1)
 
         if token_type == 'identifier' and value not in self.identifiers:
             # Add any newly discovered identifiers to the identifiers table
             self.identifiers[value] = new_token
-       
+
         return new_token
 
+    def _get_line(self, line_number):
+        """Get Line (Protected)
 
-    def _scan_msg(self, msg, prefix='Warning', hl=-1):
+        Returns a line stripped of leading and trailing whitespace given a
+        line number.
+
+        Arguments:
+            line_number: The line number of the attached source file to print.
+
+        Returns:
+            The requested line number from the source, None on invalid line.
+        """
+        if line_number > 0 and line_number <= len(self.__src):
+            return self.__src[line_number-1].strip()
+
+    def __warning(self, msg, hl=-1):
         """Print Scanner Message (Protected)
 
         Prints a formatted message. Used for errors, warnings, or info.
 
         Arguments:
             msg: The main message to display
-            prefix: The type of message. Defaults to 'Warning'.
             hl: If not -1, there will be an pointer (^) under a
                 character in the line to be highlighted.
         """
         line = self.__src[self.__line_pos][0:-1]
 
-        print(prefix.title(), ': ', sep='', end='')
-        print('\"{0}\", line {1}'.format(self._src_path, self.__line_pos+1))
+        print('Warning: "', self._src_path, '", ', sep='', end='')
+        print('line ', self.__line_pos+1, sep='')
         print('    ', msg, '\n    ', line.strip(), sep='')
 
         if hl != -1:
@@ -180,7 +173,6 @@ class Scanner(object):
             print('    {0}^'.format(' '*(abs(hl)-lspaces)))
 
         return
-
 
     def __next_word(self):
         """Get Next Word Character (Private)
@@ -210,7 +202,6 @@ class Scanner(object):
         self.__char_pos += 1
         return char
 
-
     def __next_line(self):
         """Travel to Next Line (Private)
 
@@ -227,7 +218,6 @@ class Scanner(object):
             return False
 
         return True
-
 
     def __next_char(self, peek=False):
         """Get Next Character (Private)
@@ -255,7 +245,6 @@ class Scanner(object):
 
         return char
 
-
     def __expect_string(self):
         """Expect String Token (Private)
 
@@ -276,7 +265,7 @@ class Scanner(object):
         if string_end == -1:
             hanging_quote = True
             string_end = len(self.__src[self.__line_pos]) - 1
-            self._scan_msg('No closing quotation in string', hl=string_end)
+            self.__warning('No closing quotation in string', hl=string_end)
 
         value = self.__src[self.__line_pos][self.__char_pos:string_end]
 
@@ -285,14 +274,13 @@ class Scanner(object):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
                 msg = 'Invalid character \'{0}\' in string'.format(char)
-                self._scan_msg(msg, hl=self.__char_pos+i)
+                self.__warning(msg, hl=self.__char_pos+i)
 
         self.__char_pos += len(value)
         if not hanging_quote:
             self.__char_pos += 1
 
         return value, 'string'
-
 
     def __expect_number(self, char):
         """Expect Number Token (Private)
@@ -336,7 +324,6 @@ class Scanner(object):
 
         return value, token_type
 
-
     def __expect_identifier(self, char):
         """Expect Identifier Token (Private)
 
@@ -369,7 +356,6 @@ class Scanner(object):
 
         return value, token_type
 
-
     def __expect_symbol(self, char):
         """Expect Symbol Token (Private)
 
@@ -384,7 +370,7 @@ class Scanner(object):
             valid identifier or 'comment' indicating a comment until line end.
         """
         value = '' + char
-        
+
         while True:
             char = self.__next_char(peek=True)
 
@@ -394,9 +380,8 @@ class Scanner(object):
                 return None, 'comment'
             elif value + char not in self.symbols:
                 break
-            
+
             value += char
             self.__char_pos += 1
 
-        return value, 'symbol' 
-
+        return value, 'symbol'

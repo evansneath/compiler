@@ -3,8 +3,8 @@
 from scanner import Scanner
 
 
-class ParserError(Exception):
-    """ParserError class
+class ParsingError(Exception):
+    """ParsingError class
 
     An exception created for the Parser class. This bubbles errors up to a
     recoverable resync point.
@@ -34,7 +34,6 @@ class Parser(Scanner):
         super(Parser, self).__init__()
 
         # Public class attributes
-        #self.token = None
         self.debug = debug
 
         # Define the current and future token holders
@@ -43,9 +42,33 @@ class Parser(Scanner):
 
         return
 
+    def parse(self, src_path):
+        """Begin Parsing
+
+        Begins the parse of the inputted source file.
+
+        Arguments:
+            src_path: The input source file to parse.
+
+        Returns:
+            True on success, False otherwise.
+        """
+        self.attach_file(src_path)
+
+        # Advance the tokens twice to populate both current and future tokens
+        self.advance_token()
+        self.advance_token()
+
+        # Begin parsing the <program> structure
+        try:
+            self.parse_program()
+        except ParsingError as e:
+            return False
+
+        return True
 
     def error(self, expected):
-        """Print Parser Error Message (Protected)
+        """Print Parser Error Message
 
         Prints a parser error message with details about the expected token
         and the current token being parsed.
@@ -55,17 +78,15 @@ class Parser(Scanner):
         """
         token = self.current
 
-        print('Error: ', sep='', end='')
-        print('\"{0}\", line {1}'.format(self._src_path, token.line))
+        print('Error: "{0}", line {1}'.format(self._src_path, token.line))
         print('    Expected {0}, '.format(expected), end='')
         print('encountered \"{0}\" ({1})'.format(token.value, token.type))
         print('    {0}'.format(self._get_line(token.line)))
 
         # Raise an error and either bubble up to a resync point or fail out
-        raise ParserError(expected)
+        raise ParsingError(expected)
 
         return
-
 
     def advance_token(self):
         """Advance Tokens
@@ -76,10 +97,9 @@ class Parser(Scanner):
         self.current = self.future
 
         if self.future is None or self.future.type not in ['eof', 'error']:
-            self.future = self._next_token()
+            self.future = self.next_token()
 
         return
-
 
     def check(self, type, value=None, future=False):
         """Check Token
@@ -100,12 +120,7 @@ class Parser(Scanner):
         if future:
             token = self.future
 
-        if token.type == type and (token.value == value or value is None):
-            #if self.debug: print('>>> Checking:', self.current)
-            return True
-
-        return False
-
+        return token.type == type and (token.value == value or value is None)
 
     def accept(self, type, value=None):
         """Accept Token
@@ -121,12 +136,13 @@ class Parser(Scanner):
             True if the token matches the expected value, False otherwise.
         """
         if self.check(type, value):
-            if self.debug: print('>>> Consuming:', self.current)
+            if self.debug:
+                print('>>> Consuming:', self.current)
+
             self.advance_token()
             return True
 
         return False
-
 
     def match(self, type, value=None):
         """Match Token
@@ -146,39 +162,12 @@ class Parser(Scanner):
             return True
 
         # Something different than expected was encountered
-        if type == 'identifier':
+        if type in ['identifier', 'integer', 'float', 'string']:
             self.error(type)
         else:
-            self.error('\"'+value+'\"')
+            self.error('"'+value+'"')
 
         return False
-        
-
-    def parse(self, src_path):
-        """Begin Parsing
-
-        Begins the parse of the inputted source file.
-
-        Arguments:
-            src_path: The input source file to parse.
-
-        Returns:
-            True on success, False otherwise.
-        """
-        self._attach_file(src_path)
-
-        # Advance the tokens twice to populate both current and future tokens
-        self.advance_token()
-        self.advance_token()
-
-        # Begin parsing the <program> structure
-        try:
-            self.parse_program()
-        except ParserError as e:
-            return False
-
-        return True
-
 
     def parse_program(self):
         """<program>
@@ -193,7 +182,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_program_header(self):
         """<program_header>
 
@@ -207,7 +195,6 @@ class Parser(Scanner):
         self.match('keyword', 'is')
 
         return
-
 
     def parse_program_body(self):
         """<program_body>
@@ -232,7 +219,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_declaration(self):
         """<declaration>
 
@@ -254,7 +240,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_variable_declaration(self):
         """first(<variable_declaration>)
 
@@ -270,7 +255,6 @@ class Parser(Scanner):
                 self.check('keyword', 'float') or
                 self.check('keyword', 'bool') or
                 self.check('keyword', 'string'))
-
 
     def parse_variable_declaration(self):
         """<variable_declaration>
@@ -300,7 +284,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_procedure_declaration(self):
         """first(<procedure_declarations>)
 
@@ -314,7 +297,6 @@ class Parser(Scanner):
         """
         return self.check('keyword', 'procedure')
 
-
     def parse_procedure_declaration(self):
         """<procedure_declaration>
 
@@ -327,7 +309,6 @@ class Parser(Scanner):
         self.parse_procedure_body()
 
         return
-
 
     def parse_procedure_header(self):
         """<procedure_header>
@@ -347,7 +328,6 @@ class Parser(Scanner):
         self.match('symbol', ')')
 
         return
-
 
     def parse_procedure_body(self):
         """<procedure_body>
@@ -372,7 +352,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_parameter_list(self):
         """<parameter_list>
 
@@ -388,7 +367,6 @@ class Parser(Scanner):
             self.parse_parameter_list()
 
         return
-
 
     def parse_parameter(self):
         """<parameter>
@@ -408,7 +386,6 @@ class Parser(Scanner):
             self.error('\"in\" or \"out\"')
 
         return
-
 
     def parse_statement(self):
         """<statement>
@@ -437,7 +414,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_assignment_statement(self):
         """first(<assignment_statement>)
 
@@ -451,7 +427,6 @@ class Parser(Scanner):
         """
         return self.check('identifier')
 
-    
     def parse_assignment_statement(self):
         """<assignment_statement>
 
@@ -466,7 +441,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_if_statement(self):
         """first(<if_statement>)
 
@@ -480,7 +454,6 @@ class Parser(Scanner):
         """
         return self.check('keyword', 'if')
 
-    
     def parse_if_statement(self):
         """<if_statement>
 
@@ -519,7 +492,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_loop_statement(self):
         """first(<loop_statement>)
 
@@ -532,7 +504,6 @@ class Parser(Scanner):
             True if current token matches a first terminal, False otherwise.
         """
         return self.check('keyword', 'for')
-
 
     def parse_loop_statement(self):
         """<loop_statement>
@@ -559,7 +530,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_procedure_call(self):
         """first(<procedure_call>)
 
@@ -574,7 +544,6 @@ class Parser(Scanner):
             True if current token matches a first terminal, False otherwise.
         """
         return self.check('symbol', '(', future=True)
-
 
     def parse_procedure_call(self):
         """<procedure_call>
@@ -594,7 +563,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_argument_list(self):
         """<argument_list>
 
@@ -611,7 +579,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_destination(self):
         """<destination>
 
@@ -627,7 +594,6 @@ class Parser(Scanner):
             self.accept('symbol', ']')
 
         return
-
 
     def parse_expression(self):
         """<expression>
@@ -654,7 +620,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_arith_op(self):
         """<arith_op>
 
@@ -677,7 +642,6 @@ class Parser(Scanner):
 
         return
 
-    
     def parse_relation(self):
         """<relation>
 
@@ -712,7 +676,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_term(self):
         """<term>
 
@@ -734,7 +697,6 @@ class Parser(Scanner):
                 break
 
         return
-
 
     def parse_factor(self):
         """<factor>
@@ -774,7 +736,6 @@ class Parser(Scanner):
 
         return
 
-
     def first_name(self):
         """first(<name>)
 
@@ -787,7 +748,6 @@ class Parser(Scanner):
             True if current token matches a first terminal, False otherwise.
         """
         return self.check('identifier')
-
 
     def parse_name(self):
         """<name>
@@ -805,7 +765,6 @@ class Parser(Scanner):
 
         return
 
-
     def parse_number(self):
         """Parse Number
 
@@ -822,4 +781,3 @@ class Parser(Scanner):
             self.error('number')
 
         return
-
