@@ -1,15 +1,23 @@
 #!/usr/bin/env python3
 
-"""
-File:       scanner.py
-Author:     Evan Sneath
+"""Scanner module
+
+With any attached file, the Scanner class will scan the file token-by-token
+until an end-of-file is encountered.
+
+Author: Evan Sneath
+License: Open Software License v3.0
+
+Classes:
+    Token: A named tuple object containing token information.
+    Scanner: An implementation of a scanner for the source language.
 """
 
 from collections import namedtuple
 import os
 
 
-# Create a named tuple object factory for tokens
+"""Create a named tuple object factory for tokens"""
 Token = namedtuple('Token', ['type', 'value', 'line'])
 
 
@@ -17,11 +25,19 @@ class Scanner(object):
     """Scanner class
 
     This class implements a scanner object to scan a source code file in the
-    compilation process.
+    compilation process. This class is designed to be subclassed to be used
+    during the parsing stage of the compiler.
 
     Attributes:
-        identifiers: A identifiers (symbol) table. All identifiers are stored
+        identifiers: An identifiers (symbol) table. All identifiers are stored
             in the dictionary with the identifier name as the key.
+        keywords: A list of valid keywords in the language.
+        symbols: A list of valid symbols in the language.
+
+    Methods:
+        attach_file: Binds a source file to the scanner to begin scanning.
+        next_token: Returns the next token of the attached file. This token
+            will be of the Token named tuple class.
     """
     # Define an empty identifier (symbol) table for use in the scanner
     identifiers = {}
@@ -152,14 +168,14 @@ class Scanner(object):
             return self.__src[line_number-1].strip()
 
     def __warning(self, msg, hl=-1):
-        """Print Scanner Warning Message (Protected)
+        """Print Scanner Warning Message (Private)
 
         Prints a formatted warning message.
 
         Arguments:
             msg: The warning message to display
             hl: If not -1, there will be an pointer (^) under a
-                character in the line to be highlighted.
+                character in the line to be highlighted. (Default: -1)
         """
         line = self.__src[self.__line_pos][0:-1]
 

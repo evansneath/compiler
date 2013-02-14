@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 
-"""
-File:       compiler.py
-Author:     Evan Sneath
+"""Compiler module
+
+Acts as the command line interface to the compiler components. When given a
+source file, the compilation process will be executed.
+
+Author: Evan Sneath
+License: Open Software License v3.0
+
+Functions:
+    main: The main call to begin input file compilation given valid arguments.
 """
 
 # Import standard libraries

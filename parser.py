@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 
+"""Parser module
+
+Inherits the Scanner module and parses the attached file's tokens as they are
+encountered with the target grammar.
+
+Author: Evan Sneath
+License: Open Software License v3.0
+
+Classes:
+    ParsingError: Denotes an an error while parsing the source file.
+    Parser: An implementation of a parser for the source language.
+"""
+
 from scanner import Scanner
 
 
@@ -28,6 +41,10 @@ class Parser(Scanner):
     Attributes:
         debug: Boolean attribute denoting if successfully parsed tokens should
             be displayed as they are encountered and parsed.
+
+    Methods:
+        parse: Parses the given file until a terminal error is encountered or
+            the end-of-file token is reached.
     """
     def __init__(self, debug=False):
         super(Parser, self).__init__()
@@ -108,8 +125,8 @@ class Parser(Scanner):
 
         Arguments:
             type: The expected type of the token.
-            value: The expected value of the token.
-            future: If True, the future (not current) token will be checked.
+            value: The expected value of the token. (Default: None)
+            future: If True, the future token is checked (Default: False)
 
         Returns:
             True if the token matches the expected value, False otherwise.
@@ -129,7 +146,7 @@ class Parser(Scanner):
 
         Arguments:
             type: The expected type of the token.
-            value: The expected value of the token.
+            value: The expected value of the token. (Default: None)
 
         Returns:
             True if the token matches the expected value, False otherwise.
@@ -151,7 +168,7 @@ class Parser(Scanner):
 
         Arguments:
             type: The expected type of the token.
-            value: The expected value of the token.
+            value: The expected value of the token. (Default: None)
 
         Returns:
             True if the token matches the expected value, False otherwise.
