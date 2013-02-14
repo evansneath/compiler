@@ -14,7 +14,7 @@ Classes:
 """
 
 from collections import namedtuple
-import os
+from os.path import isfile
 
 
 """Create a named tuple object factory for tokens"""
@@ -84,8 +84,8 @@ class Scanner(object):
             True on success, False otherwise.
         """
         # Make sure the inputted file is a actual file
-        if not os.path.isfile(src_path):
-            print('Error: \"{0}\"'.format(src_path))
+        if not isfile(src_path):
+            print('Error: "{0}"'.format(src_path))
             print('    Inputted path is not a file')
             return False
 
@@ -94,7 +94,7 @@ class Scanner(object):
             with open(src_path) as f:
                 self.__src = f.read().splitlines(keepends=True)
         except IOError:
-            print('Error: \"{0}\"'.format(src_path))
+            print('Error: "{0}"'.format(src_path))
             print('    Could not read inputted file')
             return False
 
@@ -122,7 +122,7 @@ class Scanner(object):
             return Token('eof', None, self.__line_pos)
 
         # Use the first character to choose the token type to expect
-        if char == '\"':
+        if char == '"':
             value, token_type = self.__expect_string()
         elif char.isdigit():
             value, token_type = self.__expect_number(char)
@@ -274,7 +274,7 @@ class Scanner(object):
         hanging_quote = False
 
         # We know this is a string. Find the next quotation and return it
-        string_end = self.__src[self.__line_pos].find('\"', self.__char_pos)
+        string_end = self.__src[self.__line_pos].find('"', self.__char_pos)
 
         # If we have a hanging quotation, assume quote ends at end of line
         if string_end == -1:

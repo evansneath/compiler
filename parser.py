@@ -69,7 +69,8 @@ class Parser(Scanner):
         Returns:
             True on success, False otherwise.
         """
-        self.attach_file(src_path)
+        if not self.attach_file(src_path):
+            return False
 
         # Advance the tokens twice to populate both current and future tokens
         self.__advance_token()
@@ -96,7 +97,7 @@ class Parser(Scanner):
 
         print('Error: "{0}", line {1}'.format(self._src_path, token.line))
         print('    Expected {0}, '.format(expected), end='')
-        print('encountered \"{0}\" ({1})'.format(token.value, token.type))
+        print('encountered "{0}" ({1})'.format(token.value, token.type))
         print('    {0}'.format(self._get_line(token.line)))
 
         # Raise an error and either bubble up to a resync point or fail out
@@ -399,7 +400,7 @@ class Parser(Scanner):
         elif self.__accept('keyword', 'out'):
             pass
         else:
-            self.__error('\"in\" or \"out\"')
+            self.__error('"in" or "out"')
 
         return
 
