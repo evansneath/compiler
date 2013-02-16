@@ -14,7 +14,6 @@ Classes:
 """
 
 from scanner import Scanner
-import traceback
 
 
 class ParsingError(Exception):
@@ -81,31 +80,47 @@ class Parser(Scanner):
         try:
             self._parse_program()
         except ParsingError:
-            if self.debug:
-                # If debug and a fatal error occurs, print full stack trace
-                print(traceback.format_exc())
-
             return False
 
+        # Make sure there's no junk after the end of program
+        if not self._check('eof'):
+            self._warning('eof')
+
         return True
+
+
+    def _warning(self, expected, prefix='Warning'):
+        """Print Parser Warning Message (Protected)
+
+        Prints a parser warning message with details about the expected token
+        and the current token being parsed.
+
+        Arguments:
+            expected: A string containing the expected token type/value.
+            prefix: A string value to be printed at the start of the warning.
+                Overwritten for error messages. (Default: 'Warning')
+        """
+        token = self._current
+
+        print('{0}: "{1}", line {2}'.format(prefix, self._src_path, token.line))
+        print('    Expected {0}, '.format(expected), end='')
+        print('encountered "{0}" ({1})'.format(token.value, token.type))
+        print('    {0}'.format(self._get_line(token.line)))
+
+        return
+
 
     def _error(self, expected):
         """Print Parser Error Message (Protected)
 
         Prints a parser error message with details about the expected token
-        and the current token being parsed.
+        and the current token being parsed. After error printing, an exception
+        is raised to be caught and resolved by parent nodes.
 
         Arguments:
             expected: A string containing the expected token type/value.
         """
-        token = self._current
-
-        print('Error: "{0}", line {1}'.format(self._src_path, token.line))
-        print('    Expected {0}, '.format(expected), end='')
-        print('encountered "{0}" ({1})'.format(token.value, token.type))
-        print('    {0}'.format(self._get_line(token.line)))
-
-        # Raise an error and either bubble up to a resync point or fail out
+        self._warning(expected, prefix='Error')
         raise ParsingError(expected)
 
         return
