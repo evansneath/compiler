@@ -88,7 +88,6 @@ class Parser(Scanner):
 
         return True
 
-
     def _warning(self, expected, prefix='Warning'):
         """Print Parser Warning Message (Protected)
 
@@ -108,7 +107,6 @@ class Parser(Scanner):
         print('    {0}'.format(self._get_line(token.line)))
 
         return
-
 
     def _error(self, expected):
         """Print Parser Error Message (Protected)
