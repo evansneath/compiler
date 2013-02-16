@@ -11,19 +11,45 @@ program test_program is
         string two_param;
     begin
         two_param := "Hello, World";
+        return;
     end procedure;
 
-    integer test_int;
-    integer another_int;
-    integer hello;
+    integer i;
+    integer one_int;
+    integer two_int;
+    integer red_int;
+    integer blue_int;
+    integer mult_of_two;
+
+    string test_string;
+
+    bool isGreaterThan;
 
 begin
 
+    test_string := "Hello, World";
 
-    test_int := 1234;
-    another_int := 5678;
+    one_int := 1;
+    two_int := 2;
+    red_int := 3;
+    mult_of_two := 1;
 
-    // TODO: This breaks things. Recursive calls to __consume_term
-    //test_int := another_int + test_int;
+    // Test some expressions
+    blue_int := (((((one_int * two_int) + red_int))));
+
+    isGreaterThan := false;
+
+    // Testing 'if' statements
+    if ((blue_int * 2) >= -1) then
+        isGreaterThan := true;
+    end if;
+
+    // Testing 'for' statements
+    for (i := 0; i <= blue_int)
+        i := i + 1;
+        mult_of_two := i * 2;
+    end for;
+
+    return;
 
 end program

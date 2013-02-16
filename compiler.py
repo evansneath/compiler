@@ -31,7 +31,7 @@ def main():
     args = parser.parse_args()
 
     # Create a Parser object to parse the inputted source file
-    parser = Parser(debug=False)
+    parser = Parser(debug=True)
 
     if parser.parse(args.source):
         print('Successfully parsed', args.source)

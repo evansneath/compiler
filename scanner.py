@@ -62,11 +62,11 @@ class Scanner(object):
         self._src_path = ''
 
         # Holds all source file data (code) to be scanned
-        self.__src = ''
+        self._src = ''
 
         # Holds the location of the next character to scan in the source file
-        self.__line_pos = 0
-        self.__char_pos = 0
+        self._line_pos = 0
+        self._char_pos = 0
 
         # Initialize the symbol table with each keyword
         for keyword in self.keywords:
@@ -92,7 +92,7 @@ class Scanner(object):
         # Try to read all data from the file and split by line
         try:
             with open(src_path) as f:
-                self.__src = f.read().splitlines(keepends=True)
+                self._src = f.read().splitlines(keepends=True)
         except IOError:
             print('Error: "{0}"'.format(src_path))
             print('    Could not read inputted file')
@@ -116,35 +116,35 @@ class Scanner(object):
         token_type = ''
 
         # Get the first character, narrow down the data type possiblilites
-        char = self.__next_word()
+        char = self._next_word()
 
         if char is None:
-            return Token('eof', None, self.__line_pos)
+            return Token('eof', None, self._line_pos)
 
         # Use the first character to choose the token type to expect
         if char == '"':
-            value, token_type = self.__expect_string()
+            value, token_type = self._expect_string()
         elif char.isdigit():
-            value, token_type = self.__expect_number(char)
+            value, token_type = self._expect_number(char)
         elif char.isalpha():
-            value, token_type = self.__expect_identifier(char)
+            value, token_type = self._expect_identifier(char)
         elif char in self.symbols:
-            value, token_type = self.__expect_symbol(char)
+            value, token_type = self._expect_symbol(char)
         else:
             # We've run across a character that shouldn't be here
             msg = 'Invalid character \'{0}\' encountered'.format(char)
-            self.__warning(msg, hl=self.__char_pos-1)
+            self._warning(msg, hl=self._char_pos-1)
 
             # Run this function again until we find something good
             return self.next_token()
 
         if token_type == 'comment':
             # If we find a comment, get a token on the next line
-            self.__next_line()
+            self._next_line()
             return self.next_token()
 
         # Build the new token object
-        new_token = Token(token_type, value, self.__line_pos+1)
+        new_token = Token(token_type, value, self._line_pos+1)
 
         if token_type == 'identifier' and value not in self.identifiers:
             # Add any newly discovered identifiers to the identifiers table
@@ -164,11 +164,11 @@ class Scanner(object):
         Returns:
             The requested line number from the source, None on invalid line.
         """
-        if line_number > 0 and line_number <= len(self.__src):
-            return self.__src[line_number-1].strip()
+        if line_number > 0 and line_number <= len(self._src):
+            return self._src[line_number-1].strip()
 
-    def __warning(self, msg, hl=-1):
-        """Print Scanner Warning Message (Private)
+    def _warning(self, msg, hl=-1):
+        """Print Scanner Warning Message (Protected)
 
         Prints a formatted warning message.
 
@@ -177,10 +177,10 @@ class Scanner(object):
             hl: If not -1, there will be an pointer (^) under a
                 character in the line to be highlighted. (Default: -1)
         """
-        line = self.__src[self.__line_pos][0:-1]
+        line = self._src[self._line_pos][0:-1]
 
         print('Warning: "', self._src_path, '", ', sep='', end='')
-        print('line ', self.__line_pos+1, sep='')
+        print('line ', self._line_pos+1, sep='')
         print('    ', msg, '\n    ', line.strip(), sep='')
 
         if hl != -1:
@@ -189,8 +189,8 @@ class Scanner(object):
 
         return
 
-    def __next_word(self):
-        """Get Next Word Character (Private)
+    def _next_word(self):
+        """Get Next Word Character (Protected)
 
         Move the cursor to the start of the next non-space character in the
         file.
@@ -202,40 +202,40 @@ class Scanner(object):
         char = ''
 
         while True:
-            char = self.__src[self.__line_pos][self.__char_pos]
+            char = self._src[self._line_pos][self._char_pos]
 
             # React according to spaces and newlines
             if char == '\n':
-                if not self.__next_line():
+                if not self._next_line():
                     return None
             elif char in ' \t':
-                self.__char_pos += 1
+                self._char_pos += 1
             else:
                 break
 
         # Increment to the next character
-        self.__char_pos += 1
+        self._char_pos += 1
         return char
 
-    def __next_line(self):
-        """Travel to Next Line (Private)
+    def _next_line(self):
+        """Travel to Next Line (Protected)
 
         Move the cursor to the start of the next line safely.
 
         Returns:
             True on success, False if end of file is encountered
         """
-        self.__line_pos += 1
-        self.__char_pos = 0
+        self._line_pos += 1
+        self._char_pos = 0
 
         # Check to make sure this isn't the end of file
-        if self.__line_pos == len(self.__src):
+        if self._line_pos == len(self._src):
             return False
 
         return True
 
-    def __next_char(self, peek=False):
-        """Get Next Character (Private)
+    def _next_char(self, peek=False):
+        """Get Next Character (Protected)
 
         Move the cursor to the next character in the file.
 
@@ -248,7 +248,7 @@ class Scanner(object):
             was reached.
         """
         # Get the next pointed character
-        char = self.__src[self.__line_pos][self.__char_pos]
+        char = self._src[self._line_pos][self._char_pos]
 
         # Return None if we hit a line ending
         if char == '\n':
@@ -256,12 +256,12 @@ class Scanner(object):
 
         # Increment to the next character
         if not peek:
-            self.__char_pos += 1
+            self._char_pos += 1
 
         return char
 
-    def __expect_string(self):
-        """Expect String Token (Private)
+    def _expect_string(self):
+        """Expect String Token (Protected)
 
         Parses the following characters in hope of a valid string. If an
         invalid string is encountered, all attempts are made to make it valid.
@@ -274,31 +274,31 @@ class Scanner(object):
         hanging_quote = False
 
         # We know this is a string. Find the next quotation and return it
-        string_end = self.__src[self.__line_pos].find('"', self.__char_pos)
+        string_end = self._src[self._line_pos].find('"', self._char_pos)
 
         # If we have a hanging quotation, assume quote ends at end of line
         if string_end == -1:
             hanging_quote = True
-            string_end = len(self.__src[self.__line_pos]) - 1
-            self.__warning('No closing quotation in string', hl=string_end)
+            string_end = len(self._src[self._line_pos]) - 1
+            self._warning('No closing quotation in string', hl=string_end)
 
-        value = self.__src[self.__line_pos][self.__char_pos:string_end]
+        value = self._src[self._line_pos][self._char_pos:string_end]
 
         # Check for illegal characters, send a warning if encountered
         for i, char in enumerate(value):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
                 msg = 'Invalid character \'{0}\' in string'.format(char)
-                self.__warning(msg, hl=self.__char_pos+i)
+                self._warning(msg, hl=self._char_pos+i)
 
-        self.__char_pos += len(value)
+        self._char_pos += len(value)
         if not hanging_quote:
-            self.__char_pos += 1
+            self._char_pos += 1
 
         return value, 'string'
 
-    def __expect_number(self, char):
-        """Expect Number Token (Private)
+    def _expect_number(self, char):
+        """Expect Number Token (Protected)
 
         Parses the following characters in hope of a valid integer or float.
 
@@ -316,7 +316,7 @@ class Scanner(object):
         is_float = False
 
         while True:
-            char = self.__next_char(peek=True)
+            char = self._next_char(peek=True)
 
             if char is None:
                 break
@@ -328,7 +328,7 @@ class Scanner(object):
                 break
 
             value += char
-            self.__char_pos += 1
+            self._char_pos += 1
 
         # Remove all underscores in the int/float. These serve no purpose
         value = value.replace('_', '')
@@ -339,8 +339,8 @@ class Scanner(object):
 
         return value, token_type
 
-    def __expect_identifier(self, char):
-        """Expect Identifier Token (Private)
+    def _expect_identifier(self, char):
+        """Expect Identifier Token (Protected)
 
         Parses the following characters in hope of a valid identifier.
 
@@ -356,7 +356,7 @@ class Scanner(object):
         token_type = 'identifier'
 
         while True:
-            char = self.__next_char(peek=True)
+            char = self._next_char(peek=True)
 
             if char is None:
                 break
@@ -364,15 +364,15 @@ class Scanner(object):
                 break
 
             value += char
-            self.__char_pos += 1
+            self._char_pos += 1
 
         if value in self.keywords:
             token_type = 'keyword'
 
         return value, token_type
 
-    def __expect_symbol(self, char):
-        """Expect Symbol Token (Private)
+    def _expect_symbol(self, char):
+        """Expect Symbol Token (Protected)
 
         Parses the following characters in hope of a valid symbol.
 
@@ -387,7 +387,7 @@ class Scanner(object):
         value = '' + char
 
         while True:
-            char = self.__next_char(peek=True)
+            char = self._next_char(peek=True)
 
             if char is None:
                 break
@@ -397,6 +397,6 @@ class Scanner(object):
                 break
 
             value += char
-            self.__char_pos += 1
+            self._char_pos += 1
 
         return value, 'symbol'
