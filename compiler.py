@@ -26,12 +26,14 @@ def main():
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
+    parser.add_argument('-d', '--debug', help='print debug information',
+            action='store_true')
     #parser.add_argument('target', help='target path for the compiled code')
-    parser.add_argument('source', help='source code to compile')
+    parser.add_argument('source', help='source file to compile')
     args = parser.parse_args()
 
     # Create a Parser object to parse the inputted source file
-    parser = Parser(debug=False)
+    parser = Parser(args.debug)
 
     if parser.parse(args.source):
         print('Parsed "'+args.source+'"')
