@@ -117,6 +117,10 @@ class Parser(Scanner):
 
         Arguments:
             expected: A string containing the expected token type/value.
+
+        Raises:
+            ParsingError: If this method is being called, an error has been
+                encountered during parsing.
         """
         self._warning(expected, prefix='Error')
         raise ParsingError(expected)
@@ -197,10 +201,10 @@ class Parser(Scanner):
             return True
 
         # Something different than expected was encountered
-        if type in ['identifier', 'integer', 'float', 'string']:
-            self._error(type)
+        if value is not None:
+            self._error('"'+value+'" ('+type+')')
         else:
-            self._error('"'+value+'"')
+            self._error(type)
 
         return False
 

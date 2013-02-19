@@ -133,7 +133,7 @@ class Scanner(object):
         else:
             # We've run across a character that shouldn't be here
             msg = 'Invalid character \'{0}\' encountered'.format(char)
-            self._warning(msg, hl=self._char_pos-1)
+            self._scan_warning(msg, hl=self._char_pos-1)
 
             # Run this function again until we find something good
             return self.next_token()
@@ -167,7 +167,7 @@ class Scanner(object):
         if line_number > 0 and line_number <= len(self._src):
             return self._src[line_number-1].strip()
 
-    def _warning(self, msg, hl=-1):
+    def _scan_warning(self, msg, hl=-1):
         """Print Scanner Warning Message (Protected)
 
         Prints a formatted warning message.
@@ -280,7 +280,7 @@ class Scanner(object):
         if string_end == -1:
             hanging_quote = True
             string_end = len(self._src[self._line_pos]) - 1
-            self._warning('No closing quotation in string', hl=string_end)
+            self._scan_warning('No closing quotation in string', hl=string_end)
 
         value = self._src[self._line_pos][self._char_pos:string_end]
 
@@ -289,7 +289,7 @@ class Scanner(object):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
                 msg = 'Invalid character \'{0}\' in string'.format(char)
-                self._warning(msg, hl=self._char_pos+i)
+                self._scan_warning(msg, hl=self._char_pos+i)
 
         self._char_pos += len(value)
         if not hanging_quote:

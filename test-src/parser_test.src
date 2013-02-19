@@ -46,7 +46,7 @@ begin
 
     // Testing 'for' statements
     for (i := 0; i <= blue_int)
-        i := i + 1;
+        i := i + 1.;
         mult_of_two := i * 2;
     end for;
 

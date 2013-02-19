@@ -34,9 +34,9 @@ def main():
     parser = Parser(debug=False)
 
     if parser.parse(args.source):
-        print('Successfully parsed', args.source)
+        print('Parsed "'+args.source+'"')
     else:
-        print('Error while parsing', args.source)
+        print('Error while parsing "'+args.source+'"')
 
     return
 
