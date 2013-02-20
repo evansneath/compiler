@@ -9,21 +9,11 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Classes:
-    ParsingError: Denotes an an error while parsing the source file.
     Parser: An implementation of a parser for the source language.
 """
 
 from scanner import Scanner
 from pprint import pprint
-
-
-class ParsingError(Exception):
-    """ParsingError class
-
-    An exception created for the Parser class. This bubbles errors up to a
-    recoverable resync point.
-    """
-    pass
 
 
 class Parser(Scanner):
@@ -75,7 +65,7 @@ class Parser(Scanner):
         # Begin parsing the root <program> language structure
         try:
             self._parse_program()
-        except ParsingError:
+        except SyntaxError:
             return False
 
         # Make sure there's no junk after the end of program
@@ -115,11 +105,11 @@ class Parser(Scanner):
             expected: A string containing the expected token type/value.
 
         Raises:
-            ParsingError: If this method is being called, an error has been
+            SyntaxError: If this method is being called, an error has been
                 encountered during parsing.
         """
         self._warning(expected, prefix='Error')
-        raise ParsingError()
+        raise SyntaxError()
 
         return
 
@@ -296,7 +286,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'begin'):
             try:
                 self._parse_declaration()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -304,7 +294,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -480,7 +470,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'begin'):
             try:
                 self._parse_declaration()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -488,7 +478,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -620,7 +610,7 @@ class Parser(Scanner):
         while True:
             try:
                 self._parse_statement()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -632,7 +622,7 @@ class Parser(Scanner):
             while True:
                 try:
                     self._parse_statement()
-                except ParsingError:
+                except SyntaxError:
                     self._resync_at_token('symbol', ';')
 
                 self._match('symbol', ';')
@@ -673,7 +663,7 @@ class Parser(Scanner):
 
         try:
             self._parse_assignment_statement()
-        except ParsingError:
+        except SyntaxError:
             self._resync_at_token('symbol', ';')
 
         self._match('symbol', ';')
@@ -683,7 +673,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except ParsingError:
+            except SyntaxError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
