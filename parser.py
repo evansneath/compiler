@@ -14,6 +14,7 @@ Classes:
 """
 
 from scanner import Scanner
+from pprint import pprint
 
 
 class ParsingError(Exception):
@@ -21,16 +22,8 @@ class ParsingError(Exception):
 
     An exception created for the Parser class. This bubbles errors up to a
     recoverable resync point.
-
-    Attributes:
-        expected: The value expected when the Parser encountered an error.
     """
-    def __init__(self, expected):
-        self.expected = expected
-        return
-
-    def __str__(self):
-        return repr(self.expected)
+    pass
 
 
 class Parser(Scanner):
@@ -55,6 +48,9 @@ class Parser(Scanner):
         # Define the current and future token holders
         self._current = None
         self._future = None
+
+        self._identifiers = [{}]
+        self._scope = 0
 
         return
 
@@ -123,7 +119,37 @@ class Parser(Scanner):
                 encountered during parsing.
         """
         self._warning(expected, prefix='Error')
-        raise ParsingError(expected)
+        raise ParsingError()
+
+        return
+
+    def _push_scope(self):
+        """Push New Identifier Scope (Protected)
+
+        Creates a new scope on the identifiers table and increases the global
+        current scope counter.
+        """
+        self._scope += 1
+        self._identifiers.append({})
+
+        if self.debug:
+            print('Pushing new scope:', self._scope)
+            pprint(self._identifiers)
+
+        return
+
+    def _pop_scope(self):
+        """Pop Highest Identifier Scope (Protected)
+
+        Disposes of the current scope in the identifiers table and decrements
+        the global current scope counter.
+        """
+        if self.debug:
+            print('Popping scope:', self._scope)
+            pprint(self._identifiers)
+
+        self._identifiers.pop(self._scope)
+        self._scope -= 1
 
         return
 
@@ -245,8 +271,14 @@ class Parser(Scanner):
                 'program' <identifier> 'is'
         """
         self._match('keyword', 'program')
+
+        id_name = self._current.value
         self._match('identifier')
+
         self._match('keyword', 'is')
+
+        self._identifiers[self._scope][id_name] = ('program', None)
+        self._push_scope()
 
         return
 
@@ -279,6 +311,8 @@ class Parser(Scanner):
 
         self._match('keyword', 'program')
 
+        self._pop_scope()
+
         return
 
     def _parse_declaration(self):
@@ -290,13 +324,15 @@ class Parser(Scanner):
                 [ 'global' ] <procedure_declaration>
                 [ 'global' ] <variable_declaration>
         """
+        is_global = False
+
         if self._accept('keyword', 'global'):
-            pass
+            is_global = True
 
         if self._first_procedure_declaration():
-            self._parse_procedure_declaration()
+            self._parse_procedure_declaration(is_global)
         elif self._first_variable_declaration():
-            self._parse_variable_declaration()
+            self._parse_variable_declaration(is_global)
         else:
             self._error('procedure or variable declaration')
 
@@ -318,14 +354,25 @@ class Parser(Scanner):
                 self._check('keyword', 'bool') or
                 self._check('keyword', 'string'))
 
-    def _parse_variable_declaration(self):
+    def _parse_variable_declaration(self, is_global=False):
         """<variable_declaration> (Protected)
 
         Parses the <variable_declaration> language structure.
 
             <variable_declaration> ::=
                 <type_mark> <identifier> [ '[' <array_size> ']' ]
+
+        Arguments:
+            is_global: Denotes if the variable is to be globally scoped.
+                (Default: False)
         """
+        id_scope = self._scope
+
+        if is_global:
+            id_scope = 0
+
+        id_type = self._current.value
+
         if self._accept('keyword', 'integer'):
             pass
         elif self._accept('keyword', 'float'):
@@ -338,11 +385,20 @@ class Parser(Scanner):
             self._error('variable declaration')
             return
 
+        id_name = self._current.value
         self._match('identifier')
 
+        id_elements = 1
+
         if self._accept('symbol', '['):
+            # TODO: Throw TypeError if id_element type != integer
+            id_elements = self._current.value
+
             self._parse_number()
             self._match('symbol', ']')
+
+        # The declaration was valid, add the identifier to the table
+        self._identifiers[id_scope][id_name] = (id_type, id_elements)
 
         return
 
@@ -359,28 +415,42 @@ class Parser(Scanner):
         """
         return self._check('keyword', 'procedure')
 
-    def _parse_procedure_declaration(self):
+    def _parse_procedure_declaration(self, is_global):
         """<procedure_declaration> (Protected)
 
         Parses the <procedure_declaration> language structure.
 
             <procedure_declaration> ::=
                 <procedure_header> <procedure_body>
+
+        Arguments:
+            is_global: Denotes if the procedure is to be globally scoped.
         """
-        self._parse_procedure_header()
+        self._parse_procedure_header(is_global)
         self._parse_procedure_body()
 
         return
 
-    def _parse_procedure_header(self):
+    def _parse_procedure_header(self, is_global):
         """<procedure_header> (Protected)
 
         Parses the <procedure_header> language structure.
 
             <procedure_header> ::=
                 'procedure' <identifier> '(' [ <parameter_list> ] ')'
+
+        Arguments:
+            is_global: Denotes if the procedure is to be globally scoped.
         """
+        id_scope = self._scope
+
+        if is_global:
+            id_scope = 0
+
         self._match('keyword', 'procedure')
+
+        id_name = self._current.value
+
         self._match('identifier')
         self._match('symbol', '(')
 
@@ -388,6 +458,11 @@ class Parser(Scanner):
             self._parse_parameter_list()
 
         self._match('symbol', ')')
+
+        # Add the procedure identifier to the parent and its own table
+        self._identifiers[id_scope][id_name] = ('procedure', None)
+        self._push_scope()
+        self._identifiers[self._scope][id_name] = ('procedure', None)
 
         return
 
@@ -419,6 +494,8 @@ class Parser(Scanner):
             self._match('symbol', ';')
 
         self._match('keyword', 'procedure')
+
+        self._pop_scope()
 
         return
 

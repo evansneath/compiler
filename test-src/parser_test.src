@@ -7,23 +7,24 @@
 
 program test_program is
 
+    integer i;
+    global integer one_int;
+    integer two_int;
+    integer red_int;
+    integer blue_int;
+    integer mult_of_two;
+    integer test_array[15];
+
+    string test_string;
+
+    bool isGreaterThan;
+
     procedure test()
         string two_param;
     begin
         two_param := "Hello, World";
         return;
     end procedure;
-
-    integer i;
-    integer one_int;
-    integer two_int;
-    integer red_int;
-    integer blue_int;
-    integer mult_of_two;
-
-    string test_string;
-
-    bool isGreaterThan;
 
 begin
 

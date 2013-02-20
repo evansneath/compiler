@@ -29,8 +29,6 @@ class Scanner(object):
     during the parsing stage of the compiler.
 
     Attributes:
-        identifiers: An identifiers (symbol) table. All identifiers are stored
-            in the dictionary with the identifier name as the key.
         keywords: A list of valid keywords in the language.
         symbols: A list of valid symbols in the language.
 
@@ -39,9 +37,6 @@ class Scanner(object):
         next_token: Returns the next token of the attached file. This token
             will be of the Token named tuple class.
     """
-    # Define an empty identifier (symbol) table for use in the scanner
-    identifiers = {}
-
     # Define all language keywords
     keywords = [
         'string', 'integer', 'bool', 'float', 'global', 'is', 'in', 'out',
@@ -67,10 +62,6 @@ class Scanner(object):
         # Holds the location of the next character to scan in the source file
         self._line_pos = 0
         self._char_pos = 0
-
-        # Initialize the symbol table with each keyword
-        for keyword in self.keywords:
-            self.identifiers[keyword] = Token('keyword', keyword, None)
 
     def attach_file(self, src_path):
         """Attach file
@@ -145,10 +136,6 @@ class Scanner(object):
 
         # Build the new token object
         new_token = Token(token_type, value, self._line_pos+1)
-
-        if token_type == 'identifier' and value not in self.identifiers:
-            # Add any newly discovered identifiers to the identifiers table
-            self.identifiers[value] = new_token
 
         return new_token
 
