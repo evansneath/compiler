@@ -21,17 +21,22 @@ In order to run, this software requires the following dependencies:
 <tr><td><b>Component</b></td><td><b>Status</b></td></tr>
 <tr><td>Scanning</td><td>Completed</td></tr>
 <tr><td>Parsing</td><td>Completed</td></tr>
-<tr><td>Type Checking</td><td>Not Started</td></tr>
+<tr><td>Type Checking</td><td>In Progress</td></tr>
 <tr><td>Code Generation</td><td>Not Started</td></tr>
 <tr><td>Runtime</td><td>Not Started</td></tr>
 </table>
 
 ##Usage
-To start the compiler, run:
 ```
-./compiler.py <source>
+usage: compiler.py [-h] [-d] source
+
+positional arguments:
+  source       source file to compile
+
+optional arguments:
+  -h, --help   show this help message and exit
+  -d, --debug  print debug information
 ```
-Where `<source>` is the source file to scan and parse.
 
 At the moment, the compiler will scan the source file for all valid tokens and 
 parse the language grammar. All scanner and parser errors will be outputted 
