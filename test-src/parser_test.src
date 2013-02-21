@@ -15,6 +15,8 @@ program test_program is
     integer mult_of_two;
     integer test_array[15];
 
+    integer two_int;
+
     string test_string;
 
     bool isGreaterThan;
@@ -34,6 +36,8 @@ begin
     two_int := 2;
     red_int := 3;
     mult_of_two := 1;
+
+    this_doesnt_exist := 666;
 
     // Test some expressions
     blue_int := (((((one_int * two_int) + red_int))));

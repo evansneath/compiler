@@ -9,11 +9,111 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Classes:
+    IdentifierTable: Extends the 'list' type to provide ID table functionality.
     Parser: An implementation of a parser for the source language.
 """
 
 from scanner import Scanner
 from pprint import pprint
+
+
+class IdentifierTable(list):
+    """IdentifierTable class
+
+    Extends the List built-in type with all methods necessary for identifier
+    table management during compilation.
+
+    Methods:
+        push_scope: Adds a new scope.
+        pop_scope: Removes the highest scope.
+        add: Adds a new identifier to the current or global scope.
+        find: Determines if an identifier is in the current of global scope.
+    """
+    def __init__(self):
+        super(IdentifierTable, self).__init__()
+
+        # Tracks the active scope
+        self._scope = 0
+
+        # Create the global scope
+        self.append({})
+
+        return
+
+    def push_scope(self):
+        """Push New Identifier Scope
+
+        Creates a new scope on the identifiers table and increases the global
+        current scope counter.
+        """
+        self._scope += 1
+        self.append({})
+
+        return
+
+    def pop_scope(self):
+        """Pop Highest Identifier Scope
+
+        Disposes of the current scope in the identifiers table and decrements
+        the global current scope counter.
+        """
+        self.pop(self._scope)
+        self._scope -= 1
+
+        return
+
+    def add(self, name, type, size=None, is_global=False):
+        """Add Identifier to Scope
+
+        Adds a new identifier to either the current scope of global.
+
+        Arguments:
+            name: The identifier name. This acts as the dictionary key.
+            type: The datatype of the identifier.
+            size: The number of elements of the identifier if a variable.
+                If procedure or program type, None is expected. (Default: None)
+            is_global: Determines whether the identifier should be added to
+                the current scope or the global scope. (Default: False)
+
+        Raises:
+            NameError if the identifier has been declared at this scope.
+        """
+        scope = self._scope
+        if is_global:
+            scope = 0
+
+        if name in self[scope]:
+            raise NameError()
+
+        self[scope][name] = (type, size)
+
+        return
+
+    def find(self, name):
+        """Find Identifier in Scope
+
+        Searches for the given identifier in the current and global scope.
+
+        Arguments:
+            identifier: The identifier name for which to search.
+
+        Returns:
+            (type, size) - A tuple containing identifier type and size
+            information if found in the current or global scopes.
+
+        Raises:
+            NameError if the given identifier is not found in any valid scope.
+        """
+        id_tuple = None
+
+        if name in self[self._scope]:
+            id_tuple = self[self._scope][name]
+        elif name in self[0]:
+            id_tuple = self[0][name]
+        else:
+            raise NameError()
+
+        return id_tuple
 
 
 class Parser(Scanner):
@@ -39,8 +139,7 @@ class Parser(Scanner):
         self._current = None
         self._future = None
 
-        self._identifiers = [{}]
-        self._scope = 0
+        self._ids = IdentifierTable()
 
         return
 
@@ -110,36 +209,6 @@ class Parser(Scanner):
         """
         self._warning(expected, prefix='Error')
         raise SyntaxError()
-
-        return
-
-    def _push_scope(self):
-        """Push New Identifier Scope (Protected)
-
-        Creates a new scope on the identifiers table and increases the global
-        current scope counter.
-        """
-        self._scope += 1
-        self._identifiers.append({})
-
-        if self.debug:
-            print('Pushing new scope:', self._scope)
-            pprint(self._identifiers)
-
-        return
-
-    def _pop_scope(self):
-        """Pop Highest Identifier Scope (Protected)
-
-        Disposes of the current scope in the identifiers table and decrements
-        the global current scope counter.
-        """
-        if self.debug:
-            print('Popping scope:', self._scope)
-            pprint(self._identifiers)
-
-        self._identifiers.pop(self._scope)
-        self._scope -= 1
 
         return
 
@@ -267,8 +336,8 @@ class Parser(Scanner):
 
         self._match('keyword', 'is')
 
-        self._identifiers[self._scope][id_name] = ('program', None)
-        self._push_scope()
+        self._ids.add(id_name, 'program')
+        self._ids.push_scope()
 
         return
 
@@ -301,7 +370,7 @@ class Parser(Scanner):
 
         self._match('keyword', 'program')
 
-        self._pop_scope()
+        self._ids.pop_scope()
 
         return
 
@@ -356,11 +425,6 @@ class Parser(Scanner):
             is_global: Denotes if the variable is to be globally scoped.
                 (Default: False)
         """
-        id_scope = self._scope
-
-        if is_global:
-            id_scope = 0
-
         id_type = self._current.value
 
         if self._accept('keyword', 'integer'):
@@ -378,17 +442,22 @@ class Parser(Scanner):
         id_name = self._current.value
         self._match('identifier')
 
-        id_elements = 1
+        id_size = 1
 
         if self._accept('symbol', '['):
             # TODO: Throw TypeError if id_element type != integer
-            id_elements = self._current.value
+            id_size = self._current.value
 
             self._parse_number()
             self._match('symbol', ']')
 
         # The declaration was valid, add the identifier to the table
-        self._identifiers[id_scope][id_name] = (id_type, id_elements)
+        try:
+            self._ids.add(id_name, id_type, id_size, is_global)
+        except NameError:
+            # TODO: Display a real error message
+            # Another identifier of this name exists at this scope
+            print('Error: %s has already been declared in this scope' % id_name)
 
         return
 
@@ -432,11 +501,6 @@ class Parser(Scanner):
         Arguments:
             is_global: Denotes if the procedure is to be globally scoped.
         """
-        id_scope = self._scope
-
-        if is_global:
-            id_scope = 0
-
         self._match('keyword', 'procedure')
 
         id_name = self._current.value
@@ -450,9 +514,9 @@ class Parser(Scanner):
         self._match('symbol', ')')
 
         # Add the procedure identifier to the parent and its own table
-        self._identifiers[id_scope][id_name] = ('procedure', None)
-        self._push_scope()
-        self._identifiers[self._scope][id_name] = ('procedure', None)
+        self._ids.add(id_name, 'procedure', is_global=is_global)
+        self._ids.push_scope()
+        self._ids.add(id_name, 'procedure', is_global=False)
 
         return
 
@@ -485,7 +549,7 @@ class Parser(Scanner):
 
         self._match('keyword', 'procedure')
 
-        self._pop_scope()
+        self._ids.pop_scope()
 
         return
 
@@ -572,7 +636,19 @@ class Parser(Scanner):
             <assignment_statement> ::=
                 <destination> ':=' <expression>
         """
+        id_name = self._current.value
+        id_type = self._current.type
+
         self._parse_destination()
+
+        # Make sure that identifier is valid for the scope
+        try:
+            self._ids.find(id_name)
+        except NameError:
+            # TODO: Display a real error message
+            # A variable was referenced that isn't declared in this scope
+            print('Error: %s was used, but is not declared in this scope.' % id_name)
+        
         self._match('symbol', ':=')
         self._parse_expression()
 
