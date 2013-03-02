@@ -12,10 +12,11 @@ program test_program is
     integer two_int;
     integer red_int;
     integer blue_int;
-    integer mult_of_two;
+    integer mult_of_two[1];
     integer test_array[15];
 
-    integer two_int;
+    // MULTIPLE DEFINITIONS OF two_int
+    //integer two_int;
 
     string test_string;
 
@@ -32,15 +33,19 @@ begin
 
     test_string := "Hello, World";
 
-    one_int := 1;
-    two_int := 2;
-    red_int := 3;
+    one_int := 1 & 2;
+    two_int := 333;
+    red_int := 3 + 4.4;
     mult_of_two := 1;
 
-    this_doesnt_exist := 666;
+    // NEVER DECLARED. SHOULD RAISE AN ERROR
+    //this_doesnt_exist := 42;
+
+    // THIS IS A PROCEDURE, NOT VAR. SHOULD RAISE AN ERROR
+    //test := "This is no ok";
 
     // Test some expressions
-    blue_int := (((((one_int * two_int) + red_int))));
+    blue_int := (((((one_int * two_int[one_int]) + red_int))));
 
     isGreaterThan := false;
 
