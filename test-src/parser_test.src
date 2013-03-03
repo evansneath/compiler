@@ -33,8 +33,11 @@ begin
 
     test_string := "Hello, World";
 
-    one_int := 1 & 2;
-    two_int := 333;
+    // VARIABLE USED FOR FUNCTION CALL
+    //one_int();
+
+    one_int := 1;
+    two_int := 2;
     red_int := 3 + 4.4;
     mult_of_two := 1;
 

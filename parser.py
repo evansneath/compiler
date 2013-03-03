@@ -654,6 +654,8 @@ class Parser(Scanner):
             <parameter> ::=
                 <variable_declaration> ( 'in' | 'out' )
         """
+        # TODO: Store the 'in'/'out' attributes of the parameters
+        #       for later checks during procedure calls
         self._parse_variable_declaration()
 
         if self._accept('keyword', 'in'):
@@ -713,10 +715,14 @@ class Parser(Scanner):
             <assignment_statement> ::=
                 <destination> ':=' <expression>
         """
-        self._parse_destination()
+        line = self._current.line
 
+        dest_type = self._parse_destination()
         self._match('symbol', ':=')
-        self._parse_expression()
+        expr_type = self._parse_expression()
+
+        if dest_type != expr_type:
+            self._type_error(dest_type, expr_type, line)
 
         return
 
@@ -847,10 +853,27 @@ class Parser(Scanner):
             <procedure_call> ::=
                 <identifier> '(' [ <argument_list> ] ')'
         """
+        # Match an identifier, check to make sure the identifier is procedure
+        id = None
+        id_name = self._current.value
+        id_line = self._current.line
+        id_type = None
+
         self._match('identifier')
+
+        try:
+            id = self._ids.find(id_name)
+        except NameError:
+            self._name_error('procedure has not beed declared', id_name,
+                    id_line)
+        else:
+            if id.type != 'procedure':
+                self._type_error('procedure', id.type, id_line)
+
         self._match('symbol', '(')
 
         if not self._check('symbol', ')'):
+            # TODO: Match procedure arguments to parameters here
             self._parse_argument_list()
 
         self._match('symbol', ')')
@@ -866,6 +889,8 @@ class Parser(Scanner):
                 <expression> ',' <argument_list> |
                 <expression>
         """
+        # TODO: Provide checks for the number of 'in' parameters and the
+        #       type of the parameters given.
         self._parse_expression()
 
         if self._accept('symbol', ','):
@@ -880,6 +905,9 @@ class Parser(Scanner):
 
             <destination> ::=
                 <identifier> [ '[' <expression> ']' ]
+
+        Returns:
+            Type of the destination identifier as a string.
         """
         id = None
 
@@ -899,10 +927,15 @@ class Parser(Scanner):
                 self._type_error('variable', id.type, id_line)
 
         if self._accept('symbol', '['):
-            self._parse_expression()
+            expr_line = self._current.line
+            expr_type = self._parse_expression()
+
+            if expr_type != 'integer':
+                self._type_error('integer', expr_type, expr_line)
+
             self._accept('symbol', ']')
 
-        return
+        return id.type
 
     def _parse_expression(self):
         """<expression> (Protected)
