@@ -22,7 +22,7 @@ program test_program is
 
     bool isGreaterThan;
 
-    procedure test()
+    procedure test_proc(integer my_int in)
         string two_param;
     begin
         two_param := "Hello, World";
@@ -38,14 +38,16 @@ begin
 
     one_int := 1;
     two_int := 2;
-    red_int := 3 + 4.4;
+    red_int := 3 + 4.;
     mult_of_two := 1;
+
+    test_proc(red_int);
 
     // NEVER DECLARED. SHOULD RAISE AN ERROR
     //this_doesnt_exist := 42;
 
     // THIS IS A PROCEDURE, NOT VAR. SHOULD RAISE AN ERROR
-    //test := "This is no ok";
+    //test_proc := "This is not ok";
 
     // Test some expressions
     blue_int := (((((one_int * two_int[one_int]) + red_int))));

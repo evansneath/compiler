@@ -10,7 +10,8 @@ License: Open Software License v3.0
 
 Classes:
     Identifier: A named tuple object containing identifier information.
-    IdentifierTable: Extends the 'list' type to provide ID table functionality.
+    Parameter: A named tuple object containing procedure param information.
+    IdentifierTable: Extends the list type to provide ID table functionality.
     Parser: An implementation of a parser for the source language.
 """
 
@@ -27,8 +28,20 @@ Attributes:
     type: The datatype of the identifier.
     size: The number of elements of the identifier if a variable.
         If procedure, program, or non-array type, None is expected.
+    params: A list of parameter objects describing procedure params.
 """
-Identifier = namedtuple('Identifier', ['name', 'type', 'size'])
+Identifier = namedtuple('Identifier', ['name', 'type', 'size', 'params'])
+
+
+"""Parameter class
+
+A named tuple object factory containing procedure parameter information.
+
+Attributes:
+    id: The Identifier named tuple of the parameter.
+    direction: The direction ('in' or 'out') of the parameter.
+"""
+Parameter = namedtuple('Parameter', ['id', 'direction'])
 
 
 class IdentifierTable(list):
@@ -253,6 +266,19 @@ class Parser(Scanner):
 
         return
 
+    def _runtime_error(self, msg, line):
+        """Print Runtime Error Message (Protected)
+
+        Prints a runtime error message with details about the runtime error.
+
+        Arguments:
+            msg: The reason for the error.
+            line: The line where the runtime error occured.
+        """
+        self._warning(msg, line, prefix='Error')
+
+        return
+
     def _advance_token(self):
         """Advance Tokens (Protected)
 
@@ -376,7 +402,7 @@ class Parser(Scanner):
         self._match('identifier')
 
         # Add the new identifier to the global table
-        id = Identifier(id_name, 'program', None)
+        id = Identifier(id_name, 'program', None, None)
         self._ids.add(id, is_global=True)
 
         self._match('keyword', 'is')
@@ -492,7 +518,7 @@ class Parser(Scanner):
             self._match('symbol', ']')
 
         # The declaration was valid, add the identifier to the table
-        id = Identifier(name=id_name, type=id_type, size=id_size)
+        id = Identifier(name=id_name, type=id_type, size=id_size, params=None)
 
         try:
             self._ids.add(id, is_global)
@@ -500,7 +526,7 @@ class Parser(Scanner):
             self._name_error('name already declared at this scope', id_name,
                     id_line)
 
-        return
+        return id
 
     def _parse_type_mark(self):
         """<type_mark> (Protected)
@@ -579,8 +605,15 @@ class Parser(Scanner):
         self._match('identifier')
         self._match('symbol', '(')
 
+        params = []
+
+        if not self._check('symbol', ')'):
+            params = self._parse_parameter_list()
+
+        self._match('symbol', ')')
+
         # Add the procedure identifier to the parent and its own table
-        id = Identifier(id_name, 'procedure', None)
+        id = Identifier(id_name, 'procedure', None, params)
 
         try:
             self._ids.add(id, is_global=is_global)
@@ -589,11 +622,6 @@ class Parser(Scanner):
         except NameError:
             self._name_error('name already declared at this scope', id_name,
                     id_line)
-
-        if not self._check('symbol', ')'):
-            self._parse_parameter_list()
-
-        self._match('symbol', ')')
 
         return
 
@@ -630,7 +658,7 @@ class Parser(Scanner):
 
         return
 
-    def _parse_parameter_list(self):
+    def _parse_parameter_list(self, params=[]):
         """<parameter_list> (Protected)
 
         Parse the <parameter_list> language structure.
@@ -638,13 +666,22 @@ class Parser(Scanner):
             <parameter_list> ::=
                 <parameter> ',' <parameter_list> |
                 <parameter>
+
+        Arguments:
+            params: A list of Parameter namedtuples associated with the
+                procedure. (Default: None)
+
+        Returns:
+            An completed list of all Parameter namedtuples associated
+            with the procedure.
         """
-        self._parse_parameter()
+        param = self._parse_parameter()
+        params.append(param)
 
         if self._accept('symbol', ','):
-            self._parse_parameter_list()
+            params = self._parse_parameter_list(params)
 
-        return
+        return params
 
     def _parse_parameter(self):
         """<parameter> (Protected)
@@ -654,18 +691,18 @@ class Parser(Scanner):
             <parameter> ::=
                 <variable_declaration> ( 'in' | 'out' )
         """
-        # TODO: Store the 'in'/'out' attributes of the parameters
-        #       for later checks during procedure calls
-        self._parse_variable_declaration()
+        id = self._parse_variable_declaration()
+
+        direction = None
 
         if self._accept('keyword', 'in'):
-            pass
+            direction = 'in'
         elif self._accept('keyword', 'out'):
-            pass
+            direction = 'out'
         else:
             self._syntax_error('"in" or "out"')
 
-        return
+        return Parameter(id, direction)
 
     def _parse_statement(self):
         """<statement> (Protected)
@@ -873,14 +910,18 @@ class Parser(Scanner):
         self._match('symbol', '(')
 
         if not self._check('symbol', ')'):
-            # TODO: Match procedure arguments to parameters here
-            self._parse_argument_list()
+            num_args = self._parse_argument_list(id.params, 0)
+
+            # Make sure that too few arguments are not used
+            if num_args < len(id.params):
+                self._runtime_error(('procedure call accepts %d argument(s),' +
+                        ' %d given') % (len(id.params), num_args), id_line)
 
         self._match('symbol', ')')
 
         return
 
-    def _parse_argument_list(self):
+    def _parse_argument_list(self, params, index):
         """<argument_list> (Protected)
 
         Parses <argument_list> language structure.
@@ -888,15 +929,35 @@ class Parser(Scanner):
             <argument_list> ::=
                 <expression> ',' <argument_list> |
                 <expression>
+
+        Arguments:
+            params: A list of Parameter namedtuple objects allowed in the
+                procedure call
+
+        Returns:
+            The number of arguments encountered.
         """
-        # TODO: Provide checks for the number of 'in' parameters and the
-        #       type of the parameters given.
-        self._parse_expression()
+        line = self._current.line
+
+        # Make sure that too many arguments are not used
+        if index > len(params) - 1:
+            self._runtime_error('procedure call accepts only %d argument(s)' %
+                    len(params), line)
+            return index
+
+        param = params[index]
+
+        arg_type = self._parse_expression()
+
+        if arg_type != param.id.type:
+            self._type_error(param.id.type, arg_type, line)
+
+        index += 1
 
         if self._accept('symbol', ','):
-            self._parse_argument_list()
+            index = self._parse_argument_list(params, index)
 
-        return
+        return index
 
     def _parse_destination(self):
         """<destination> (Protected)
@@ -913,6 +974,7 @@ class Parser(Scanner):
 
         id_name = self._current.value
         id_line = self._current.line
+        id_type = None
 
         self._match('identifier')
 
@@ -926,6 +988,8 @@ class Parser(Scanner):
             if not id.type in ['integer', 'float', 'bool', 'string']:
                 self._type_error('variable', id.type, id_line)
 
+            id_type = id.type
+
         if self._accept('symbol', '['):
             expr_line = self._current.line
             expr_type = self._parse_expression()
@@ -935,7 +999,7 @@ class Parser(Scanner):
 
             self._accept('symbol', ']')
 
-        return id.type
+        return id_type
 
     def _parse_expression(self):
         """<expression> (Protected)
@@ -946,6 +1010,9 @@ class Parser(Scanner):
                 <expression> '&' <arith_op> |
                 <expression> '|' <arith_op> |
                 [ 'not' ] <arith_op>
+
+        Returns:
+            The type value of the expression.
         """
         expect_int_or_bool = False
 
@@ -971,7 +1038,7 @@ class Parser(Scanner):
                 if type not in ['integer', 'bool']:
                     self._type_error('integer or bool', type, line)
 
-                self._parse_arith_op()
+                next_type = self._parse_arith_op()
 
                 if next_type not in ['integer', 'bool']:
                     self._type_error('integer or bool', next_type, line)
@@ -989,6 +1056,9 @@ class Parser(Scanner):
                 <arith_op> '+' <relation> |
                 <arith_op> '-' <relation> |
                 <relation>
+
+        Returns:
+            The type value of the expression.
         """
         line = self._current.line
         type = self._parse_relation()
@@ -1006,7 +1076,7 @@ class Parser(Scanner):
                 if type not in ['integer', 'float']:
                     self._type_error('integer or float', type, line)
 
-                self._parse_relation()
+                next_type = self._parse_relation()
 
                 if next_type not in ['integer', 'float']:
                     self._type_error('integer or float', next_type, line)
@@ -1028,6 +1098,9 @@ class Parser(Scanner):
                 <relation> '==' <term> |
                 <relation> '!=' <term> |
                 <term>
+
+        Returns:
+            The type value of the expression.
         """
         line = self._current.line
         type = self._parse_term()
@@ -1097,6 +1170,9 @@ class Parser(Scanner):
                 <term> '*' <factor> |
                 <term> '/' <factor> |
                 <factor>
+
+        Returns:
+            The type value of the expression.
         """
         line = self._current.line
         type = self._parse_factor()
@@ -1137,6 +1213,9 @@ class Parser(Scanner):
                 <string> |
                 'true' |
                 'false'
+
+        Returns:
+            The type value of the expression.
         """
         type = None
 
