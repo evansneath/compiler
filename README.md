@@ -21,7 +21,7 @@ In order to run, this software requires the following dependencies:
 <tr><td><b>Component</b></td><td><b>Status</b></td></tr>
 <tr><td>Scanning</td><td>Completed</td></tr>
 <tr><td>Parsing</td><td>Completed</td></tr>
-<tr><td>Type Checking</td><td>In Progress</td></tr>
+<tr><td>Type Checking</td><td>Completed</td></tr>
 <tr><td>Code Generation</td><td>Not Started</td></tr>
 <tr><td>Runtime</td><td>Not Started</td></tr>
 </table>
@@ -39,8 +39,8 @@ optional arguments:
 ```
 
 At the moment, the compiler will scan the source file for all valid tokens and 
-parse the language grammar. All scanner and parser errors will be outputted 
-as they are encountered.
+parse the language grammar. All scanner, parser, and type errors will be 
+outputted as they are encountered.
 
 The `test-src/` directory contains test source files which have several examples 
 of token scanning with error/warning handling and grammar parsing.
