@@ -15,17 +15,17 @@ program test_program is
     integer mult_of_two[1];
     integer test_array[15];
 
-    // MULTIPLE DEFINITIONS OF two_int
-    //integer two_int;
-
     string test_string;
 
     bool isGreaterThan;
 
     procedure test_proc(integer my_int in)
         string two_param;
+        integer assigned_int;
     begin
         two_param := "Hello, World";
+        assigned_int := my_int;
+
         return;
     end procedure;
 
@@ -33,21 +33,12 @@ begin
 
     test_string := "Hello, World";
 
-    // VARIABLE USED FOR FUNCTION CALL
-    //one_int();
-
     one_int := 1;
     two_int := 2;
     red_int := 3 + 4.;
     mult_of_two := 1;
 
     test_proc(red_int);
-
-    // NEVER DECLARED. SHOULD RAISE AN ERROR
-    //this_doesnt_exist := 42;
-
-    // THIS IS A PROCEDURE, NOT VAR. SHOULD RAISE AN ERROR
-    //test_proc := "This is not ok";
 
     // Test some expressions
     blue_int := (((((one_int * two_int[one_int]) + red_int))));

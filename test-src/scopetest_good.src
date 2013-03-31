@@ -1,0 +1,22 @@
+// SCOPE TEST PROGRAM
+program scope_test is
+    integer add1;
+    integer add2;
+    integer sum;
+
+    procedure add(integer add1 in, integer add2 in, integer sum out)
+    begin
+        sum := add1 + add2;
+        return;
+    end procedure;
+
+begin
+
+    add1 := 1;
+    add2 := 5; 
+
+    add(add1, add2, sum);
+
+    return;
+
+end program

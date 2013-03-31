@@ -3,7 +3,8 @@
 """Parser module
 
 Inherits the Scanner module and parses the attached file's tokens as they are
-encountered with the target grammar.
+encountered with the target grammar. Code is then generated and written to the
+given destination file.
 
 Author: Evan Sneath
 License: Open Software License v3.0
@@ -13,10 +14,58 @@ Classes:
     Parameter: A named tuple object containing procedure param information.
     IdentifierTable: Extends the list type to provide ID table functionality.
     Parser: An implementation of a parser for the source language.
+
+Exceptions:
+    ParserError: The base error class for the parser.
+    ParserSyntaxError: Thrown when a syntax error occurs.
+    ParserNameError: Thrown when a name error occurs.
+    ParserTypeError: Thrown when a type error occurs.
+    ParserRuntimeError: Thrown when a runtime error occurs.
 """
 
 from scanner import Scanner
 from collections import namedtuple
+
+
+class ParserError(Exception):
+    """ParserError class
+
+    The base error class for all other parsing errors. This should be caught
+    at resync points.
+    """
+    pass
+
+
+class ParserSyntaxError(ParserError):
+    """ParserSyntaxError class
+
+    Thrown when a syntax error occurs in the parser.
+    """
+    pass
+
+
+class ParserNameError(ParserError):
+    """ParserNameError class
+
+    Thrown when a name error occurs in the parser.
+    """
+    pass
+
+
+class ParserTypeError(ParserError):
+    """ParserTypeError class
+
+    Thrown when a type error occurs in the parser.
+    """
+    pass
+
+
+class ParserRuntimeError(ParserError):
+    """ParserRuntimeError class
+
+    Thrown when a runtime error occurs in the parser.
+    """
+    pass
 
 
 """Identifier class
@@ -28,7 +77,7 @@ Attributes:
     type: The datatype of the identifier.
     size: The number of elements of the identifier if a variable.
         If procedure, program, or non-array type, None is expected.
-    params: A list of parameter objects describing procedure params.
+    params: A list of Parameter class objects describing procedure params.
 """
 Identifier = namedtuple('Identifier', ['name', 'type', 'size', 'params'])
 
@@ -96,12 +145,12 @@ class IdentifierTable(list):
                 the current scope or the global scope. (Default: False)
 
         Raises:
-            NameError if the identifier has been declared at this scope.
+            ParserNameError if the identifier has been declared at this scope.
         """
         scope = -1 if not is_global else 0
 
         if identifier.name in self[scope]:
-            raise NameError()
+            raise ParserNameError()
 
         self[scope][identifier.name] = identifier
 
@@ -120,7 +169,7 @@ class IdentifierTable(list):
             information if found in the current or global scopes.
 
         Raises:
-            NameError if the given identifier is not found in any valid scope.
+            ParserNameError if the given identifier is not found in any valid scope.
         """
         identifier = None
 
@@ -129,7 +178,7 @@ class IdentifierTable(list):
         elif name in self[0]:
             identifier = self[0][name]
         else:
-            raise NameError()
+            raise ParserNameError()
 
         return identifier
 
@@ -157,17 +206,19 @@ class Parser(Scanner):
         self._current = None
         self._future = None
 
+        # Define the identifier table to hold all var/program/procedure names
         self._ids = IdentifierTable()
 
         return
 
-    def parse(self, src_path):
+    def parse(self, src_path, dest_path):
         """Begin Parsing
 
         Begins the parse of the inputted source file.
 
         Arguments:
             src_path: The input source file to parse.
+            dest_path: The output target file to write.
 
         Returns:
             True on success, False otherwise.
@@ -182,7 +233,7 @@ class Parser(Scanner):
         # Begin parsing the root <program> language structure
         try:
             self._parse_program()
-        except SyntaxError:
+        except ParserSyntaxError:
             return False
 
         # Make sure there's no junk after the end of program
@@ -220,7 +271,7 @@ class Parser(Scanner):
             expected: A string containing the expected token type/value.
 
         Raises:
-            SyntaxError: If this method is being called, an error has been
+            ParserSyntaxError: If this method is being called, an error has been
                 encountered during parsing.
         """
         token = self._current
@@ -230,7 +281,7 @@ class Parser(Scanner):
                 expected, token.value, token.type)
         self._warning(msg, token.line, prefix='Error')
 
-        raise SyntaxError()
+        raise ParserSyntaxError()
 
         return
 
@@ -426,7 +477,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'begin'):
             try:
                 self._parse_declaration()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -434,7 +485,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -461,9 +512,9 @@ class Parser(Scanner):
             is_global = True
 
         if self._first_procedure_declaration():
-            self._parse_procedure_declaration(is_global)
+            self._parse_procedure_declaration(is_global=is_global)
         elif self._first_variable_declaration():
-            self._parse_variable_declaration(is_global)
+            self._parse_variable_declaration(is_global=is_global)
         else:
             self._syntax_error('procedure or variable declaration')
 
@@ -485,7 +536,7 @@ class Parser(Scanner):
                 self._check('keyword', 'bool') or
                 self._check('keyword', 'string'))
 
-    def _parse_variable_declaration(self, is_global=False):
+    def _parse_variable_declaration(self, is_global=False, id_table_add=True):
         """<variable_declaration> (Protected)
 
         Parses the <variable_declaration> language structure.
@@ -496,6 +547,11 @@ class Parser(Scanner):
         Arguments:
             is_global: Denotes if the variable is to be globally scoped.
                 (Default: False)
+            id_table_add: Denotes if the variable is to be added to the
+                identifier table.
+
+        Returns:
+            The Identifier class object of the variable encountered.
         """
         id_type = self._parse_type_mark()
 
@@ -508,23 +564,27 @@ class Parser(Scanner):
         self._match('identifier')
 
         if self._accept('symbol', '['):
-            # Check the type to make sure this is an integer
+            id_size = self._current.value
             index_line = self._current.line
             index_type = self._parse_number()
 
+            # Check the type to make sure this is an integer so that we can
+            # allocate memory appropriately
             if  index_type != 'integer':
                 self._type_error('integer', index_type, index_line)
+                raise ParserTypeError()
 
             self._match('symbol', ']')
 
         # The declaration was valid, add the identifier to the table
         id = Identifier(name=id_name, type=id_type, size=id_size, params=None)
 
-        try:
-            self._ids.add(id, is_global)
-        except NameError as e:
-            self._name_error('name already declared at this scope', id_name,
-                    id_line)
+        if id_table_add:
+            try:
+                self._ids.add(id, is_global=is_global)
+            except ParserNameError:
+                self._name_error('name already declared at this scope', id_name,
+                        id_line)
 
         return id
 
@@ -581,7 +641,7 @@ class Parser(Scanner):
         Arguments:
             is_global: Denotes if the procedure is to be globally scoped.
         """
-        self._parse_procedure_header(is_global)
+        self._parse_procedure_header(is_global=is_global)
         self._parse_procedure_body()
 
         return
@@ -612,16 +672,24 @@ class Parser(Scanner):
 
         self._match('symbol', ')')
 
-        # Add the procedure identifier to the parent and its own table
         id = Identifier(id_name, 'procedure', None, params)
 
         try:
+            # Add the procedure identifier to the parent and its own table
             self._ids.add(id, is_global=is_global)
             self._ids.push_scope()
-            self._ids.add(id, is_global=is_global)
-        except NameError:
+            self._ids.add(id)
+        except ParserNameError as e:
             self._name_error('name already declared at this scope', id_name,
                     id_line)
+
+        # Attempt to add each encountered param at the procedure scope
+        for param in params:
+            try:
+                self._ids.add(param.id, is_global=False)
+            except ParserNameError:
+                self._name_error('name already declared at global scope',
+                        param.id.name, id_line)
 
         return
 
@@ -639,7 +707,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'begin'):
             try:
                 self._parse_declaration()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -647,7 +715,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -691,7 +759,7 @@ class Parser(Scanner):
             <parameter> ::=
                 <variable_declaration> ( 'in' | 'out' )
         """
-        id = self._parse_variable_declaration()
+        id = self._parse_variable_declaration(id_table_add=False)
 
         direction = None
 
@@ -795,7 +863,7 @@ class Parser(Scanner):
         while True:
             try:
                 self._parse_statement()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -807,7 +875,7 @@ class Parser(Scanner):
             while True:
                 try:
                     self._parse_statement()
-                except SyntaxError:
+                except ParserError:
                     self._resync_at_token('symbol', ';')
 
                 self._match('symbol', ';')
@@ -848,7 +916,7 @@ class Parser(Scanner):
 
         try:
             self._parse_assignment_statement()
-        except SyntaxError:
+        except ParserError:
             self._resync_at_token('symbol', ';')
 
         self._match('symbol', ';')
@@ -858,7 +926,7 @@ class Parser(Scanner):
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
-            except SyntaxError:
+            except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
@@ -900,28 +968,31 @@ class Parser(Scanner):
 
         try:
             id = self._ids.find(id_name)
-        except NameError:
+        except ParserNameError as e:
             self._name_error('procedure has not beed declared', id_name,
                     id_line)
-        else:
-            if id.type != 'procedure':
-                self._type_error('procedure', id.type, id_line)
+            raise e
+
+        if id.type != 'procedure':
+            self._type_error('procedure', id.type, id_line)
+            raise ParserTypeError()
 
         self._match('symbol', '(')
 
         if not self._check('symbol', ')'):
-            num_args = self._parse_argument_list(id.params, 0)
+            num_args = self._parse_argument_list(id.params)
 
             # Make sure that too few arguments are not used
             if num_args < len(id.params):
                 self._runtime_error(('procedure call accepts %d argument(s),' +
                         ' %d given') % (len(id.params), num_args), id_line)
+                raise ParserRuntimeError()
 
         self._match('symbol', ')')
 
         return
 
-    def _parse_argument_list(self, params, index):
+    def _parse_argument_list(self, params, index=0):
         """<argument_list> (Protected)
 
         Parses <argument_list> language structure.
@@ -933,6 +1004,8 @@ class Parser(Scanner):
         Arguments:
             params: A list of Parameter namedtuple objects allowed in the
                 procedure call
+            index: The index in params with which to match the found param.
+                (Default: 0)
 
         Returns:
             The number of arguments encountered.
@@ -943,7 +1016,7 @@ class Parser(Scanner):
         if index > len(params) - 1:
             self._runtime_error('procedure call accepts only %d argument(s)' %
                     len(params), line)
-            return index
+            raise ParserRuntimeError()
 
         param = params[index]
 
@@ -981,14 +1054,16 @@ class Parser(Scanner):
         # Make sure that identifier is valid for the scope
         try:
             id = self._ids.find(id_name)
-        except NameError:
+        except ParserNameError as e:
             self._name_error('not declared in this scope', id_name, id_line)
-        else:
-            # Check type to make sure it's a variable
-            if not id.type in ['integer', 'float', 'bool', 'string']:
-                self._type_error('variable', id.type, id_line)
+            raise e
 
-            id_type = id.type
+        # Check type to make sure it's a variable
+        if not id.type in ['integer', 'float', 'bool', 'string']:
+            self._type_error('variable', id.type, id_line)
+            raise ParserTypeError()
+
+        id_type = id.type
 
         if self._accept('symbol', '['):
             expr_line = self._current.line
@@ -1024,26 +1099,25 @@ class Parser(Scanner):
 
         if expect_int_or_bool and type not in ['integer', 'bool']:
             self._type_error('integer or bool', type, line)
+            raise ParserTypeError()
 
         while True:
             if self._accept('symbol', '&'):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_arith_op()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '|'):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_arith_op()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             else:
                 break
+
+            if type not in ['integer', 'bool']:
+                self._type_error('integer or bool', type, line)
+                raise ParserTypeError()
+
+            next_type = self._parse_arith_op()
+
+            if next_type not in ['integer', 'bool']:
+                self._type_error('integer or bool', next_type, line)
+                raise ParserTypeError()
 
         return type
 
@@ -1065,23 +1139,21 @@ class Parser(Scanner):
 
         while True:
             if self._accept('symbol', '+'):
-                if type not in ['integer', 'float']:
-                    self._type_error('integer or float', type, line)
-
-                next_type = self._parse_relation()
-
-                if next_type not in ['integer', 'float']:
-                    self._type_error('integer or float', next_type, line)
+                pass
             elif self._accept('symbol', '-'):
-                if type not in ['integer', 'float']:
-                    self._type_error('integer or float', type, line)
-
-                next_type = self._parse_relation()
-
-                if next_type not in ['integer', 'float']:
-                    self._type_error('integer or float', next_type, line)
+                pass
             else:
                 break
+
+            if type not in ['integer', 'float']:
+                self._type_error('integer or float', type, line)
+                raise ParserTypeError()
+
+            next_type = self._parse_relation()
+
+            if next_type not in ['integer', 'float']:
+                self._type_error('integer or float', next_type, line)
+                raise ParserTypeError()
 
         return type
 
@@ -1109,55 +1181,29 @@ class Parser(Scanner):
         # are only valid for integers or booleans
         while True:
             if self._accept('symbol', '<'):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '>'):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '<='):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '>='):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '=='):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             elif self._accept('symbol', '!='):
-                if type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', type, line)
-
-                next_type = self._parse_term()
-
-                if next_type not in ['integer', 'bool']:
-                    self._type_error('integer or bool', next_type, line)
+                pass
             else:
                 break
+
+            if type not in ['integer', 'bool']:
+                self._type_error('integer or bool', type, line)
+                raise ParserTypeError()
+
+            next_type = self._parse_term()
+
+            if next_type not in ['integer', 'bool']:
+                self._type_error('integer or bool', next_type, line)
+                raise ParserTypeError()
 
         return type
 
@@ -1181,23 +1227,21 @@ class Parser(Scanner):
         # operators are only valid for integer or float values
         while True:
             if self._accept('symbol', '*'):
-                if type not in ['integer', 'float']:
-                    self._type_error('integer or float', type, line)
-
-                next_type = self._parse_factor()
-
-                if next_type not in ['integer', 'float']:
-                    self._type_error('integer or float', next_type, line)
+                pass
             elif self._accept('symbol', '/'):
-                if type not in ['integer', 'float']:
-                    self._type_error('integer or float', type, line)
-
-                next_type = self._parse_factor()
-
-                if next_type not in ['integer', 'float']:
-                    self._type_error('integer or float', next_type, line)
+                pass
             else:
                 break
+
+            if type not in ['integer', 'float']:
+                self._type_error('integer or float', type, line)
+                raise ParserTypeError()
+
+            next_type = self._parse_factor()
+
+            if next_type not in ['integer', 'float']:
+                self._type_error('integer or float', next_type, line)
+                raise ParserTypeError()
 
         return type
 
@@ -1267,28 +1311,33 @@ class Parser(Scanner):
         """
         id_name = self._current.value
         id_line = self._current.line
+        id_type = None
 
         self._match('identifier')
 
         # Make sure that identifier is valid for the scope
         try:
             id = self._ids.find(id_name)
-        except NameError:
+            id_type = id.type
+        except ParserNameError as e:
             self._name_error('not declared in this scope', id_name, id_line)
-        else:
-            # Check type to make sure it's a variable
-            if not id.type in ['integer', 'float', 'bool', 'string']:
-                self._type_error('variable', id.type, id_line)
+            raise e
+
+        # Check type to make sure it's a variable
+        if not id_type in ['integer', 'float', 'bool', 'string']:
+            self._type_error('variable', id_type, id_line)
+            raise ParserTypeError()
 
         if self._accept('symbol', '['):
             index_type = self._parse_expression()
 
             if not index_type == 'integer':
                 self._type_error('integer', index_type, id_line)
+                raise ParserTypeError()
 
             self._match('symbol', ']')
 
-        return id.type
+        return id_type
 
     def _parse_number(self):
         """Parse Number (Protected)

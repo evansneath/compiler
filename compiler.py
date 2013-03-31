@@ -28,14 +28,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('-d', '--debug', help='print debug information',
             action='store_true')
-    #parser.add_argument('target', help='target path for the compiled code')
     parser.add_argument('source', help='source file to compile')
+    parser.add_argument('target', help='target path for the compiled code')
     args = parser.parse_args()
 
     # Create a Parser object to parse the inputted source file
     parser = Parser(args.debug)
 
-    if parser.parse(args.source):
+    if parser.parse(args.source, args.target):
         print('Parsed "'+args.source+'"')
     else:
         print('Error while parsing "'+args.source+'"')

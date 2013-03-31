@@ -1,0 +1,73 @@
+//////////////////////////////////////////////////////////////////////////////
+// File:   bigtest_bad.src
+// Author: Evan Sneath
+// Description: This is a test of the parsing component of the compiler.
+// Errors: 4 errors should be raised in this program.
+//////////////////////////////////////////////////////////////////////////////
+
+program test_program is
+
+    integer i;
+    global integer one_int;
+    integer two_int;
+    integer red_int;
+    integer blue_int;
+    integer mult_of_two[1];
+    integer test_array[15];
+
+    // ERROR 1: Multiple definitions of two_int
+    integer two_int;
+
+    string test_string;
+
+    bool isGreaterThan;
+
+    procedure test_proc(integer my_int in)
+        string two_param;
+        integer assigned_int;
+    begin
+        two_param := "Hello, World";
+        assigned_int := my_int;
+
+        return;
+    end procedure;
+
+begin
+
+    test_string := "Hello, World";
+
+    // ERROR 2: Variable used for function call
+    one_int();
+
+    one_int := 1;
+    two_int := 2;
+    red_int := 3 + 4.;
+    mult_of_two := 1;
+
+    test_proc(red_int);
+
+    // ERROR 3: Variable this_doesnt_exist never declared
+    this_doesnt_exist := 42;
+
+    // ERROR 4: Assigning to a procedure, not a variable
+    test_proc := "This is not ok";
+
+    // Test some expressions
+    blue_int := (((((one_int * two_int[one_int]) + red_int))));
+
+    isGreaterThan := false;
+
+    // Testing 'if' statements
+    if ((blue_int * 2) >= -1) then
+        isGreaterThan := true;
+    end if;
+
+    // Testing 'for' statements
+    for (i := 0; i <= blue_int)
+        i := i + 1.;
+        mult_of_two := i * 2;
+    end for;
+
+    return;
+
+end program
