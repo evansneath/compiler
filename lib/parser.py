@@ -10,183 +10,24 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Classes:
-    Identifier: A named tuple object containing identifier information.
-    Parameter: A named tuple object containing procedure param information.
-    IdentifierTable: Extends the list type to provide ID table functionality.
     Parser: An implementation of a parser for the source language.
-
-Exceptions:
-    ParserError: The base error class for the parser.
-    ParserSyntaxError: Thrown when a syntax error occurs.
-    ParserNameError: Thrown when a name error occurs.
-    ParserTypeError: Thrown when a type error occurs.
-    ParserRuntimeError: Thrown when a runtime error occurs.
 """
 
-from scanner import Scanner
-from collections import namedtuple
+from lib.errors import *
+from lib.datatypes import Identifier, Parameter, IdentifierTable
+
+from lib.scanner import Scanner
+from lib.codegenerator import CodeGenerator
 
 
-class ParserError(Exception):
-    """ParserError class
-
-    The base error class for all other parsing errors. This should be caught
-    at resync points.
-    """
-    pass
-
-
-class ParserSyntaxError(ParserError):
-    """ParserSyntaxError class
-
-    Thrown when a syntax error occurs in the parser.
-    """
-    pass
-
-
-class ParserNameError(ParserError):
-    """ParserNameError class
-
-    Thrown when a name error occurs in the parser.
-    """
-    pass
-
-
-class ParserTypeError(ParserError):
-    """ParserTypeError class
-
-    Thrown when a type error occurs in the parser.
-    """
-    pass
-
-
-class ParserRuntimeError(ParserError):
-    """ParserRuntimeError class
-
-    Thrown when a runtime error occurs in the parser.
-    """
-    pass
-
-
-"""Identifier class
-
-A named tuple object factory containing identifier information.
-
-Attributes:
-    name: The identifier name. This acts as the dictionary key.
-    type: The datatype of the identifier.
-    size: The number of elements of the identifier if a variable.
-        If procedure, program, or non-array type, None is expected.
-    params: A list of Parameter class objects describing procedure params.
-"""
-Identifier = namedtuple('Identifier', ['name', 'type', 'size', 'params'])
-
-
-"""Parameter class
-
-A named tuple object factory containing procedure parameter information.
-
-Attributes:
-    id: The Identifier named tuple of the parameter.
-    direction: The direction ('in' or 'out') of the parameter.
-"""
-Parameter = namedtuple('Parameter', ['id', 'direction'])
-
-
-class IdentifierTable(list):
-    """IdentifierTable class
-
-    Extends the List built-in type with all methods necessary for identifier
-    table management during compilation.
-
-    Methods:
-        push_scope: Adds a new scope.
-        pop_scope: Removes the highest scope.
-        add: Adds a new identifier to the current or global scope.
-        find: Determines if an identifier is in the current of global scope.
-    """
-    def __init__(self):
-        super(IdentifierTable, self).__init__()
-
-        # Create the global scope
-        self.append({})
-
-        return
-
-    def push_scope(self):
-        """Push New Identifier Scope
-
-        Creates a new scope on the identifiers table and increases the global
-        current scope counter.
-        """
-        self.append({})
-
-        return
-
-    def pop_scope(self):
-        """Pop Highest Identifier Scope
-
-        Disposes of the current scope in the identifiers table and decrements
-        the global current scope counter.
-        """
-        self.pop(-1)
-
-        return
-
-    def add(self, identifier, is_global=False):
-        """Add Identifier to Scope
-
-        Adds a new identifier to either the current scope of global.
-
-        Arguments:
-            identifier: An Identifier named tuple object describing the new
-                identifier to add to the table.
-            is_global: Determines whether the identifier should be added to
-                the current scope or the global scope. (Default: False)
-
-        Raises:
-            ParserNameError if the identifier has been declared at this scope.
-        """
-        scope = -1 if not is_global else 0
-
-        if identifier.name in self[scope]:
-            raise ParserNameError()
-
-        self[scope][identifier.name] = identifier
-
-        return
-
-    def find(self, name):
-        """Find Identifier in Scope
-
-        Searches for the given identifier in the current and global scope.
-
-        Arguments:
-            name: The identifier name for which to search.
-
-        Returns:
-            An Identifier named tuple containing identifier name, type and size
-            information if found in the current or global scopes.
-
-        Raises:
-            ParserNameError if the given identifier is not found in any valid scope.
-        """
-        identifier = None
-
-        if name in self[-1]:
-            identifier = self[-1][name]
-        elif name in self[0]:
-            identifier = self[0][name]
-        else:
-            raise ParserNameError()
-
-        return identifier
-
-
-class Parser(Scanner):
+class Parser(Scanner, CodeGenerator):
     """Parser class
 
     Parses the given source file using the defined language structure.
+
+    Inherits:
+        Scanner: The lexer component of the compiler.
+        CodeGenerator: The class responsible for output file abstraction.
 
     Attributes:
         debug: Boolean attribute denoting if successfully parsed tokens should
@@ -209,6 +50,8 @@ class Parser(Scanner):
         # Define the identifier table to hold all var/program/procedure names
         self._ids = IdentifierTable()
 
+        self._has_errors = False
+
         return
 
     def parse(self, src_path, dest_path):
@@ -223,8 +66,16 @@ class Parser(Scanner):
         Returns:
             True on success, False otherwise.
         """
-        if not self.attach_file(src_path):
+        # Attach the source file for reading
+        if not self.attach_source(src_path):
             return False
+
+        # Attach the destination file for writing
+        if not self.attach_destination(dest_path):
+            return False
+
+        # Generate the compiled code header to handle runtime overhead
+        self.generate_header()
 
         # Advance the tokens twice to populate both current and future tokens
         self._advance_token()
@@ -239,6 +90,11 @@ class Parser(Scanner):
         # Make sure there's no junk after the end of program
         if not self._check('eof'):
             self._warning('eof')
+
+        if not self._has_errors:
+            self.commit()
+        else:
+            self.rollback()
 
         return True
 
@@ -281,9 +137,8 @@ class Parser(Scanner):
                 expected, token.value, token.type)
         self._warning(msg, token.line, prefix='Error')
 
+        self._has_errors = True
         raise ParserSyntaxError()
-
-        return
 
     def _name_error(self, msg, name, line):
         """Print Name Error Message (Protected)
@@ -299,6 +154,7 @@ class Parser(Scanner):
         msg = '{0}: {1}'.format(name, msg)
         self._warning(msg, line, prefix='Error')
 
+        self._has_errors = True
         return
 
     def _type_error(self, expected, encountered, line):
@@ -315,6 +171,7 @@ class Parser(Scanner):
         msg = 'Expected {0} type, encountered {1}'.format(expected, encountered)
         self._warning(msg, line, prefix='Error')
 
+        self._has_errors = True
         return
 
     def _runtime_error(self, msg, line):
@@ -328,6 +185,7 @@ class Parser(Scanner):
         """
         self._warning(msg, line, prefix='Error')
 
+        self._has_errors = True
         return
 
     def _advance_token(self):

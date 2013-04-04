@@ -9,16 +9,12 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Classes:
-    Token: A named tuple object containing token information.
     Scanner: An implementation of a scanner for the source language.
 """
 
-from collections import namedtuple
 from os.path import isfile
 
-
-"""Create a named tuple object factory for tokens"""
-Token = namedtuple('Token', ['type', 'value', 'line'])
+from lib.datatypes import Token
 
 
 class Scanner(object):
@@ -33,7 +29,7 @@ class Scanner(object):
         symbols: A list of valid symbols in the language.
 
     Methods:
-        attach_file: Binds a source file to the scanner to begin scanning.
+        attach_source: Binds a source file to the scanner to begin scanning.
         next_token: Returns the next token of the attached file. This token
             will be of the Token named tuple class.
     """
@@ -53,7 +49,7 @@ class Scanner(object):
     def __init__(self):
         super(Scanner, self).__init__()
 
-        # Hold the file path of the attached source file
+        # Holds the file path of the attached source file
         self._src_path = ''
 
         # Holds all source file data (code) to be scanned
@@ -63,10 +59,12 @@ class Scanner(object):
         self._line_pos = 0
         self._char_pos = 0
 
-    def attach_file(self, src_path):
-        """Attach file
+        return
 
-        Attach a file to the scanner and prepare for token collection.
+    def attach_source(self, src_path):
+        """Attach Source 
+
+        Attach a source file to the scanner and prepare for token collection.
 
         Arguments:
             src_path: The path to the source file to scan.

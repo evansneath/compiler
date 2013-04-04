@@ -16,7 +16,7 @@ Functions:
 import argparse
 
 # Import custom compiler libraries
-from parser import Parser
+from lib.parser import Parser
 
 
 def main():
