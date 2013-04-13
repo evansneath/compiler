@@ -35,6 +35,21 @@ class CodeGenerator(object):
         # Holds all generated code to be written to the file destination
         self._generated_code = ''
 
+        # Holds allocated size of main memory and num registers
+        self._mm_size = 2048
+        self._reg_size = 1024
+
+        # Holds stack pointer, frame pointer, register pointer
+        self._sp = 0
+        self._fp = 0
+        self._reg = 0
+
+        # Holds the tabcount of the code. tab_push, tab_pop manipulate this
+        self._tab_count = 0
+
+        # Holds an integer used for unique label generation for if/loop
+        self._label_id = 0
+
         return
 
     def attach_destination(self, dest_path):
@@ -57,15 +72,57 @@ class CodeGenerator(object):
     def generate_header(self):
         """Generate Code Header
         """
-        self.generate('// This is a test program')
+        code = [
+            '#include \"stdio.h\"',
+            '',
+            '#define MM_SIZE ' + str(self._mm_size),
+            '#define R_SIZE  ' + str(self._reg_size),
+            '',
+            'int main(void)',
+            '{',
+            '// allocate main memory',
+            'int MM[MM_SIZE];',
+            '',
+            '// allocate register space',
+            'int R[R_SIZE];',
+            '',
+            'goto _entry;',
+            '',
+            '_entry:',
+        ]
+
+        self.generate('\n'.join(code), tabs=0)
 
         return
 
-    def generate(self, code):
+    def generate_footer(self):
+        """Generate Code Footer
+        """
+        code = [
+            '',
+            '_end:',
+            '    return 0;',
+            '}',
+        ]
+
+        self.generate('\n'.join(code), tabs=0)
+
+        return
+
+    def generate(self, code, tabs=-1):
         """Generate Code
         """
-        self._generated_code += code + '\n'
+        tabs = tabs if tabs != -1 else self._tab_count
+        self._generated_code += ('    ' * tabs) + code + '\n'
 
+        return
+
+    def tab_push(self):
+        self._tab_count += 1
+        return
+
+    def tab_pop(self):
+        self._tab_count -= 1 if self._tab_count != 0 else 0
         return
 
     def commit(self):
@@ -88,4 +145,39 @@ class CodeGenerator(object):
 
         return
 
+    def get_stack_space(self, id_size):
+        """Get Memory Space
+        """
+        # Determine size of the identifier
+        mem_needed = int(id_size) if id_size is not None else 1
+        
+        # Get the next memory space from the stack pointer
+        var_loc = self._sp
 
+        # Bump the stack pointer to the next location
+        self._sp += mem_needed
+
+        return var_loc
+
+    def get_reg(self, inc=True):
+        """Get Register
+        """
+        # Increment the register if we're getting a brand new one
+        self._reg += 1 if inc else 0
+
+        return self._reg
+
+    def get_label_id(self):
+        """Get Label Id
+        """
+        self._label_id += 1
+
+        return self._label_id
+
+    def do_operation(self, operand1, operand2, operation):
+        """Do Operation
+        """
+        self.generate('R[%d] = R[%d] %s R[%d];' %
+                (self.get_reg(), operand1, operation, operand2))
+
+        return

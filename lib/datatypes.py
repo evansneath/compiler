@@ -42,7 +42,8 @@ Attributes:
         If procedure, program, or non-array type, None is expected.
     params: A list of Parameter class objects describing procedure params.
 """
-Identifier = namedtuple('Identifier', ['name', 'type', 'size', 'params'])
+Identifier = namedtuple('Identifier',
+        ['name', 'type', 'size', 'params', 'mm_ptr'])
 
 
 """Parameter class

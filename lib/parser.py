@@ -43,7 +43,8 @@ class Parser(Scanner, CodeGenerator):
         # Public class attributes
         self.debug = debug
 
-        # Define the current and future token holders
+        # Define the previous, current, and future token holder
+        self._previous = None
         self._current = None
         self._future = None
 
@@ -76,6 +77,7 @@ class Parser(Scanner, CodeGenerator):
 
         # Generate the compiled code header to handle runtime overhead
         self.generate_header()
+        self.tab_push()
 
         # Advance the tokens twice to populate both current and future tokens
         self._advance_token()
@@ -86,6 +88,9 @@ class Parser(Scanner, CodeGenerator):
             self._parse_program()
         except ParserSyntaxError:
             return False
+
+        # Generate the compiled code footer
+        self.generate_footer()
 
         # Make sure there's no junk after the end of program
         if not self._check('eof'):
@@ -194,6 +199,7 @@ class Parser(Scanner, CodeGenerator):
         Populates the 'current' token with the 'future' token and populates
         the 'future' token with the next token in the source file.
         """
+        self._previous = self._current
         self._current = self._future
 
         if self._future is None or self._future.type != 'eof':
@@ -255,19 +261,17 @@ class Parser(Scanner, CodeGenerator):
             value: The expected value of the token. (Default: None)
 
         Returns:
-            True if the token matches the expected value, False otherwise.
+            The matched Token class object if successful.
         """
         # Check the type, if we specified debug, print everything matchd
         if self._accept(type, value):
-            return True
+            return self._previous
 
         # Something different than expected was encountered
         if value is not None:
             self._syntax_error('"'+value+'" ('+type+')')
         else:
             self._syntax_error(type)
-
-        return False
 
     def _resync_at_token(self, type, value=None):
         """Resync at Token
@@ -311,7 +315,7 @@ class Parser(Scanner, CodeGenerator):
         self._match('identifier')
 
         # Add the new identifier to the global table
-        id = Identifier(id_name, 'program', None, None)
+        id = Identifier(id_name, 'program', None, None, None)
         self._ids.add(id, is_global=True)
 
         self._match('keyword', 'is')
@@ -413,18 +417,17 @@ class Parser(Scanner, CodeGenerator):
         """
         id_type = self._parse_type_mark()
 
-        # Start collecting info about the identifier
-        id_name = self._current.value
-        id_line = self._current.line
-        id_size = None
+        # Stores the array size of the variable
+        var_size = None
 
         # Formally match the token to an identifier type
-        self._match('identifier')
+        var_token = self._match('identifier')
 
         if self._accept('symbol', '['):
-            id_size = self._current.value
-            index_line = self._current.line
             index_type = self._parse_number()
+
+            var_size = self._previous.value
+            index_line = self._previous.line
 
             # Check the type to make sure this is an integer so that we can
             # allocate memory appropriately
@@ -434,15 +437,18 @@ class Parser(Scanner, CodeGenerator):
 
             self._match('symbol', ']')
 
+        # Get the memory space pointer for this variable
+        mm_ptr = self.get_stack_space(var_size)
+
         # The declaration was valid, add the identifier to the table
-        id = Identifier(name=id_name, type=id_type, size=id_size, params=None)
+        id = Identifier(var_token.value, id_type, var_size, None, mm_ptr)
 
         if id_table_add:
             try:
                 self._ids.add(id, is_global=is_global)
             except ParserNameError:
-                self._name_error('name already declared at this scope', id_name,
-                        id_line)
+                self._name_error('name already declared at this scope',
+                        var_token.value, var_token.line)
 
         return id
 
@@ -530,7 +536,7 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('symbol', ')')
 
-        id = Identifier(id_name, 'procedure', None, params)
+        id = Identifier(id_name, 'procedure', None, params, None)
 
         try:
             # Add the procedure identifier to the parent and its own table
@@ -680,12 +686,29 @@ class Parser(Scanner, CodeGenerator):
         """
         line = self._current.line
 
+        id_name = self._current.value
         dest_type = self._parse_destination()
+
+        index_reg = self.get_reg(inc=False)
+        id_obj = self._ids.find(id_name)
+
         self._match('symbol', ':=')
+
         expr_type = self._parse_expression()
+
+        expr_reg = self.get_reg(inc=False)
 
         if dest_type != expr_type:
             self._type_error(dest_type, expr_type, line)
+
+        id_addr = self.get_reg()
+
+        self.generate('R[%d] = %d;' % (id_addr, id_obj.mm_ptr))
+
+        if id_obj.size is not None:
+            self.generate('R[%d] = R[%d] + R[%d];' % (id_addr, id_addr, index_reg))
+
+        self.generate('MM[R[%d]] = R[%d];' % (id_addr, expr_reg))
 
         return
 
@@ -718,6 +741,12 @@ class Parser(Scanner, CodeGenerator):
         self._match('symbol', ')')
         self._match('keyword', 'then')
 
+        label_id = self.get_label_id()
+        expr_reg = self.get_reg(inc=False)
+
+        self.generate('if (!R[%d]) goto else_%d;' % (expr_reg, label_id))
+        self.tab_push()
+
         while True:
             try:
                 self._parse_statement()
@@ -728,6 +757,12 @@ class Parser(Scanner, CodeGenerator):
 
             if self._check('keyword', 'else') or self._check('keyword', 'end'):
                 break
+
+        self.generate('goto endif_%d;' % label_id)
+
+        self.tab_pop()
+        self.generate('else_%d:' % label_id)
+        self.tab_push()
 
         if self._accept('keyword', 'else'):
             while True:
@@ -743,6 +778,9 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('keyword', 'end')
         self._match('keyword', 'if')
+
+        self.tab_pop()
+        self.generate('endif_%d:' % label_id)
 
         return
 
@@ -778,8 +816,16 @@ class Parser(Scanner, CodeGenerator):
             self._resync_at_token('symbol', ';')
 
         self._match('symbol', ';')
+
+        label_id = self.get_label_id()
+        self.generate('loop_%d:' % label_id)
+        self.tab_push()
+
         self._parse_expression()
         self._match('symbol', ')')
+
+        expr_reg = self.get_reg(inc=False)
+        self.generate('if (!R[%d]) goto endloop_%d;' % (expr_reg, label_id))
 
         while not self._accept('keyword', 'end'):
             try:
@@ -790,6 +836,10 @@ class Parser(Scanner, CodeGenerator):
             self._match('symbol', ';')
 
         self._match('keyword', 'for')
+
+        self.generate('goto loop_%d;' % label_id)
+        self.tab_pop()
+        self.generate('endloop_%d:' % label_id)
 
         return
 
@@ -931,6 +981,8 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer', expr_type, expr_line)
 
             self._accept('symbol', ']')
+        elif id.size is not None:
+            self._runtime_error('%s: array requires index' % id_name, id_line)
 
         return id_type
 
@@ -947,23 +999,27 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             The type value of the expression.
         """
-        expect_int_or_bool = False
+        negate = False
 
         if self._accept('keyword', 'not'):
-            expect_int_or_bool = True
+            negate = True
 
         line = self._current.line
         type = self._parse_arith_op()
 
-        if expect_int_or_bool and type not in ['integer', 'bool']:
+        operand1 = self.get_reg(inc=False)
+
+        if negate and type not in ['integer', 'bool']:
             self._type_error('integer or bool', type, line)
             raise ParserTypeError()
 
         while True:
+            operation = ''
+
             if self._accept('symbol', '&'):
-                pass
+                operation = '&'
             elif self._accept('symbol', '|'):
-                pass
+                operation = '|'
             else:
                 break
 
@@ -973,9 +1029,18 @@ class Parser(Scanner, CodeGenerator):
 
             next_type = self._parse_arith_op()
 
+            operand2 = self.get_reg(inc=False)
+
             if next_type not in ['integer', 'bool']:
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
+
+            self.do_operation(operand1, operand2, operation)
+
+            result = self.get_reg(inc=False)
+
+            if negate:
+                self.generate('R[%d] = ~R[%d];' % (self.get_reg(), result))
 
         return type
 
@@ -995,11 +1060,14 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_relation()
 
+        operand1 = self.get_reg(inc=False)
+
         while True:
+            operation = ''
             if self._accept('symbol', '+'):
-                pass
+                operation = '+'
             elif self._accept('symbol', '-'):
-                pass
+                operation = '-'
             else:
                 break
 
@@ -1009,9 +1077,13 @@ class Parser(Scanner, CodeGenerator):
 
             next_type = self._parse_relation()
 
+            operand2 = self.get_reg(inc=False)
+
             if next_type not in ['integer', 'float']:
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
+
+            self.do_operation(operand1, operand2, operation)
 
         return type
 
@@ -1035,21 +1107,25 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_term()
 
+        operand1 = self.get_reg(inc=False)
+
         # Check for relational operators. Note that relational operators
         # are only valid for integers or booleans
         while True:
+            operation = ''
+
             if self._accept('symbol', '<'):
-                pass
+                operation = '<'
             elif self._accept('symbol', '>'):
-                pass
+                operation = '>'
             elif self._accept('symbol', '<='):
-                pass
+                operation = '<='
             elif self._accept('symbol', '>='):
-                pass
+                operation = '>='
             elif self._accept('symbol', '=='):
-                pass
+                operation = '=='
             elif self._accept('symbol', '!='):
-                pass
+                operation = '!='
             else:
                 break
 
@@ -1059,9 +1135,13 @@ class Parser(Scanner, CodeGenerator):
 
             next_type = self._parse_term()
 
+            operand2 = self.get_reg(inc=False)
+
             if next_type not in ['integer', 'bool']:
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
+
+            self.do_operation(operand1, operand2, operation)
 
         return type
 
@@ -1081,13 +1161,17 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_factor()
 
+        operand1 = self.get_reg(inc=False)
+
         # Check for multiplication or division operators. Note that these
         # operators are only valid for integer or float values
         while True:
+            operation = ''
+
             if self._accept('symbol', '*'):
-                pass
+                operation = '*'
             elif self._accept('symbol', '/'):
-                pass
+                operation = '/'
             else:
                 break
 
@@ -1095,11 +1179,16 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or float', type, line)
                 raise ParserTypeError()
 
+            line = self._current.line
             next_type = self._parse_factor()
+
+            operand2 = self.get_reg(inc=False)
 
             if next_type not in ['integer', 'float']:
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
+
+            self.do_operation(operand1, operand2, operation)
 
         return type
 
@@ -1126,21 +1215,74 @@ class Parser(Scanner, CodeGenerator):
             self._match('symbol', ')')
         elif self._accept('string'):
             type = 'string'
+            str_val = self._previous.value
+
+            self.generate('R[%d] = (int)"%s";' % (self.get_reg(), str_val))
         elif self._accept('keyword', 'true'):
             type = 'bool'
+
+            self.generate('R[%d] = 1;' % (self.get_reg()))
         elif self._accept('keyword', 'false'):
             type = 'bool'
+
+            self.generate('R[%d] = 0;' % (self.get_reg()))
         elif self._accept('symbol', '-'):
             if self._first_name():
+                # Get the name, parse it
+                id_name = self._current.value
                 type = self._parse_name()
+
+                index_reg = self.get_reg(inc=False)
+
+                # Get the identifier object associated with the name
+                id_obj = self._ids.find(id_name)
+
+                id_reg = self.get_reg()
+                self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
+
+                if id_obj.size is not None:
+                    self.generate('R[%d] = R[%d] + R[%d];' %
+                            (id_reg, id_reg, index_reg))
+
+                self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
             elif self._check('integer') or self._check('float'):
                 type = self._parse_number()
+                number = self._previous.value
+
+                if type == 'integer':
+                    self.generate('R[%d] = -%s;' % (self.get_reg(), number))
+                else:
+                    # TODO: Generate float stuff
+                    pass
             else:
                 self._syntax_error('variable name, integer, or float')
         elif self._first_name():
+            # Get the name, parse it
+            id_name = self._current.value
             type = self._parse_name()
+
+            index_reg = self.get_reg(inc=False)
+
+            # Get the identifier object associated with the name
+            id_obj = self._ids.find(id_name)
+
+            id_reg = self.get_reg()
+            self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
+
+            if id_obj.size is not None:
+                self.generate('R[%d] = R[%d] + R[%d];' %
+                        (id_reg, id_reg, index_reg))
+
+            self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
         elif self._check('integer') or self._check('float'):
             type = self._parse_number()
+            number = self._previous.value
+
+            if type == 'integer':
+                self.generate('R[%d] = %s;' % (self.get_reg(), number))
+            else:
+                # TODO: Generate float stuff
+                pass
         else:
             self._syntax_error('factor')
 
@@ -1194,6 +1336,8 @@ class Parser(Scanner, CodeGenerator):
                 raise ParserTypeError()
 
             self._match('symbol', ']')
+        elif id.size is not None:
+            self._runtime_error('%s: array requires index' % id_name, id_line)
 
         return id_type
 
@@ -1206,15 +1350,9 @@ class Parser(Scanner, CodeGenerator):
                 [0-9][0-9_]*[.[0-9_]*]
 
         Returns:
-            Type (as a string) of the parsed number.
+            The type of the parsed number.
         """
-        type = None
-
-        if self._accept('integer'):
-            type = 'integer'
-        elif self._accept('float'):
-            type = 'float'
-        else:
+        if not self._accept('integer') and not self._accept('float'):
             self._syntax_error('number')
 
-        return type
+        return self._previous.type

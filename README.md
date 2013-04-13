@@ -32,7 +32,7 @@ usage: compiler.py [-h] [-d] source target
 
 positional arguments:
   source       source file to compile
-  target       target pacth for the compiled code
+  target       target path for the compiled code
 
 optional arguments:
   -h, --help   show this help message and exit

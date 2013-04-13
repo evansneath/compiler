@@ -1,0 +1,45 @@
+program codegen_test is
+
+    integer add1;
+    integer add2;
+
+    string hello;
+
+    integer sum[2];
+    integer result;
+
+    bool thisistrue;
+    bool thisisfalse;
+
+    integer count;
+
+begin
+
+    add1 := 1;
+    add2 := 5; 
+    
+    sum[0] := 1 + 5;
+    sum[1] := add1 + add2;
+
+    if (sum[1] == add2) then
+        result := 1;
+    else
+        result := 0;
+    end if;
+
+    // Set 'count' to 10 the long way
+    for (count := 0; count < 10)
+        count := count + 1;
+
+        if (count == 5) then
+            // Half way there. Print a message here eventually
+            result := 2;
+        end if;
+    end for;
+
+    //hello := "WORLD";
+
+    //thisistrue := not true & false;
+    //thisisfalse := not false | true;
+
+end program

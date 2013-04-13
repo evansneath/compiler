@@ -23,7 +23,7 @@ program test_program is
         string two_param;
         integer assigned_int;
     begin
-        two_param := "Hello, World";
+        two_param := "Hello, World 2";
         assigned_int := my_int;
 
         return;
@@ -31,7 +31,7 @@ program test_program is
 
 begin
 
-    test_string := "Hello, World";
+    test_string := "Hello, World 1";
 
     one_int := 1;
     two_int := 2;
