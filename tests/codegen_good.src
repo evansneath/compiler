@@ -3,6 +3,11 @@ program codegen_test is
     integer add1;
     integer add2;
 
+    float float1;
+    float float2;
+
+    float result1;
+
     string hello;
 
     integer sum[2];
@@ -17,6 +22,12 @@ begin
 
     add1 := 1;
     add2 := 5; 
+
+    float1 := 1.1;
+    float2 := 2.;
+
+    result1 := float1 + float2;
+    result1 := float1 * add1;
     
     sum[0] := 1 + 5;
     sum[1] := add1 + add2;

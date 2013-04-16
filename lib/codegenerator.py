@@ -36,8 +36,8 @@ class CodeGenerator(object):
         self._generated_code = ''
 
         # Holds allocated size of main memory and num registers
-        self._mm_size = 2048
-        self._reg_size = 1024
+        self._mm_size = 65536
+        self._reg_size = 2048
 
         # Holds stack pointer, frame pointer, register pointer
         self._sp = 0
@@ -73,7 +73,8 @@ class CodeGenerator(object):
         """Generate Code Header
         """
         code = [
-            '#include \"stdio.h\"',
+            '#include <stdio.h>',
+            '#include <string.h>',
             '',
             '#define MM_SIZE ' + str(self._mm_size),
             '#define R_SIZE  ' + str(self._reg_size),
@@ -86,9 +87,16 @@ class CodeGenerator(object):
             '// allocate register space',
             'int R[R_SIZE];',
             '',
+            '// allocate float registers',
+            'float R_FLOAT_1;',
+            'float R_FLOAT_2;',
+            '',
+            '// allocate stack/frame pointer space in mm',
+            'int SP = R_SIZE - 1;',
+            'int FP = R_SIZE - 2;',
+            '',
             'goto _entry;',
             '',
-            '_entry:',
         ]
 
         self.generate('\n'.join(code), tabs=0)
@@ -174,10 +182,28 @@ class CodeGenerator(object):
 
         return self._label_id
 
-    def do_operation(self, operand1, operand2, operation):
+    def do_operation(self, reg1, type1, reg2, type2, operation):
         """Do Operation
         """
-        self.generate('R[%d] = R[%d] %s R[%d];' %
-                (self.get_reg(), operand1, operation, operand2))
+        # Get a register to hold the operation result
+        result = self.get_reg()
 
-        return
+        if type1 != 'float' and type2 != 'float':
+            self.generate('R[%d] = R[%d] %s R[%d];' %
+                    (result, reg1, operation, reg2))
+            return result
+
+        if type1 != 'float':
+            self.generate('R_FLOAT_1 = R[%d];' % reg1)
+        else:
+            self.generate('memcpy(&R_FLOAT_1, &R[%d], sizeof(float));' % reg1)
+
+        if type2 != 'float':
+            self.generate('R_FLOAT_2 = R[%d];' % reg2)
+        else:
+            self.generate('memcpy(&R_FLOAT_2, &R[%d], sizeof(float));' % reg2)
+
+        self.generate('R_FLOAT_1 = R_FLOAT_1 %s R_FLOAT_2;' % operation)
+        self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));' % result)
+        
+        return result

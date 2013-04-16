@@ -77,7 +77,6 @@ class Parser(Scanner, CodeGenerator):
 
         # Generate the compiled code header to handle runtime overhead
         self.generate_header()
-        self.tab_push()
 
         # Advance the tokens twice to populate both current and future tokens
         self._advance_token()
@@ -343,6 +342,10 @@ class Parser(Scanner, CodeGenerator):
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
+
+        # Label the entry point for the program
+        self.generate('_entry:')
+        self.tab_push()
 
         while not self._accept('keyword', 'end'):
             try:
@@ -1035,9 +1038,8 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
 
-            self.do_operation(operand1, operand2, operation)
-
-            result = self.get_reg(inc=False)
+            result = self.do_operation(operand1, type, operand2, next_type,
+                    operation)
 
             if negate:
                 self.generate('R[%d] = ~R[%d];' % (self.get_reg(), result))
@@ -1083,7 +1085,7 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
 
-            self.do_operation(operand1, operand2, operation)
+            self.do_operation(operand1, type, operand2, next_type, operation)
 
         return type
 
@@ -1141,7 +1143,7 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
 
-            self.do_operation(operand1, operand2, operation)
+            self.do_operation(operand1, type, operand2, next_type, operation)
 
         return type
 
@@ -1188,7 +1190,7 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
 
-            self.do_operation(operand1, operand2, operation)
+            self.do_operation(operand1, type, operand2, next_type, operation)
 
         return type
 
@@ -1252,8 +1254,9 @@ class Parser(Scanner, CodeGenerator):
                 if type == 'integer':
                     self.generate('R[%d] = -%s;' % (self.get_reg(), number))
                 else:
-                    # TODO: Generate float stuff
-                    pass
+                    self.generate('R_FLOAT_1 = -%s;' % number)
+                    self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));'
+                            % self.get_reg())
             else:
                 self._syntax_error('variable name, integer, or float')
         elif self._first_name():
@@ -1281,8 +1284,9 @@ class Parser(Scanner, CodeGenerator):
             if type == 'integer':
                 self.generate('R[%d] = %s;' % (self.get_reg(), number))
             else:
-                # TODO: Generate float stuff
-                pass
+                self.generate('R_FLOAT_1 = %s;' % number)
+                self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));'
+                        % self.get_reg())
         else:
             self._syntax_error('factor')
 
