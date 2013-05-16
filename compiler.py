@@ -54,6 +54,7 @@ def compile(source, target, debug=False):
     """
     # Define a temporary location for the intermediate C code
     TMP_CODE_FILE = './ir.c'
+    RUNTIME_LIB = './runtime/runtime.c'
 
     # Create a Parser object to parse the inputted source file
     parser = Parser(debug)
@@ -64,7 +65,7 @@ def compile(source, target, debug=False):
         return False
 
     # Set up gcc compilation command
-    gcc_cmd = ['gcc', '-m32', '-lm', '-o', target, TMP_CODE_FILE]
+    gcc_cmd = ['gcc', '-m32', '-o', target, TMP_CODE_FILE, RUNTIME_LIB]
 
     # Compile the temporary file with gcc. Output to the target location
     if call(gcc_cmd) != 0:

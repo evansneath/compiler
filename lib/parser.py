@@ -241,8 +241,8 @@ class Parser(Scanner, CodeGenerator):
             True if the token matches the expected value, False otherwise.
         """
         if self._check(type, value):
-            if self.debug:
-                print('>>> Consuming:', self._current)
+            #if self.debug:
+            #    print('>>> Consuming:', self._current)
 
             self._advance_token()
             return True
@@ -295,8 +295,8 @@ class Parser(Scanner, CodeGenerator):
             <program> ::=
                 <program_header> <program_body>
         """
-        self._parse_program_header()
-        self._parse_program_body()
+        id = self._parse_program_header()
+        self._parse_program_body(id)
 
         return
 
@@ -307,24 +307,50 @@ class Parser(Scanner, CodeGenerator):
 
             <program_header> ::=
                 'program' <identifier> 'is'
+
+        Returns:
+            The id object with information about the procedure identifier.
         """
         self._match('keyword', 'program')
 
         id_name = self._current.value
         self._match('identifier')
 
+        # Generate procedure label. This will be stored with the identifier
+        # in place of the mm_ptr attribute since it will not be used
+        label_id = self.get_label_id()
+
         # Add the new identifier to the global table
-        id = Identifier(id_name, 'program', None, None, None)
+        id = Identifier(id_name, 'program', None, None, label_id)
         self._ids.add(id, is_global=True)
 
         self._match('keyword', 'is')
 
+        # Push the return addr onto the stack
+        self.comment('Setting program return address', self.debug)
+        self.generate('MM[R[FP]] = (int)&&%s_%d_end;' % (id.name, id.mm_ptr))
+
+        # Make the jump to the entry point
+        self.generate('goto %s_%d_begin;' % (id.name, id.mm_ptr))
+
+        # Make the main program return
+        self.generate('')
+        self.comment('Creating the program exit point', self.debug)
+        self.generate('%s_%d_end:' % (id.name, id.mm_ptr))
+        self.tab_push()
+        self.generate('return 0;');
+        self.tab_pop()
+        self.generate('')
+                
         # Push the scope to the program body level
-        self._ids.push_scope()
+        self._ids.push_scope(id.name)
 
-        return
+        # Add the program to the base scope so it can be resolved as owner
+        self._ids.add(id)
 
-    def _parse_program_body(self):
+        return id
+
+    def _parse_program_body(self, id):
         """<program_body> (Protected)
 
         Parses the <program_body> language structure.
@@ -334,18 +360,30 @@ class Parser(Scanner, CodeGenerator):
                 'begin'
                     ( <statement> ';' )*
                 'end' 'program'
+
+        Arguments:
+            id: The identifier object for the program.
         """
+        local_var_size = 0
+
         while not self._accept('keyword', 'begin'):
             try:
-                self._parse_declaration()
+                size = self._parse_declaration()
+
+                if size is not None:
+                    local_var_size += int(size)
             except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
 
         # Label the entry point for the program
-        self.generate('_entry:')
+        self.generate('%s_%d_begin:' % (id.name, id.mm_ptr))
         self.tab_push()
+
+        if local_var_size != 0:
+            self.comment('Allocating space for local variables', self.debug)
+            self.generate('R[SP] = R[SP] - %d;' % local_var_size)
 
         while not self._accept('keyword', 'end'):
             try:
@@ -359,6 +397,7 @@ class Parser(Scanner, CodeGenerator):
 
         # Pop out of the program body scope
         self._ids.pop_scope()
+        self.tab_pop()
 
         return
 
@@ -370,8 +409,14 @@ class Parser(Scanner, CodeGenerator):
             <declaration> ::=
                 [ 'global' ] <procedure_declaration>
                 [ 'global' ] <variable_declaration>
+
+        Returns:
+            The size of any variable declared. None if procedure.
         """
         is_global = False
+
+        id = None
+        size = None
 
         if self._accept('keyword', 'global'):
             is_global = True
@@ -379,11 +424,14 @@ class Parser(Scanner, CodeGenerator):
         if self._first_procedure_declaration():
             self._parse_procedure_declaration(is_global=is_global)
         elif self._first_variable_declaration():
-            self._parse_variable_declaration(is_global=is_global)
+            id = self._parse_variable_declaration(is_global=is_global)
         else:
             self._syntax_error('procedure or variable declaration')
 
-        return
+        if id is not None:
+            size = id.size if id.size is not None else 1
+
+        return size
 
     def _first_variable_declaration(self):
         """first(<variable_declaration>) (Protected)
@@ -401,7 +449,7 @@ class Parser(Scanner, CodeGenerator):
                 self._check('keyword', 'bool') or
                 self._check('keyword', 'string'))
 
-    def _parse_variable_declaration(self, is_global=False, id_table_add=True):
+    def _parse_variable_declaration(self, is_global=False, is_param=False):
         """<variable_declaration> (Protected)
 
         Parses the <variable_declaration> language structure.
@@ -440,13 +488,13 @@ class Parser(Scanner, CodeGenerator):
 
             self._match('symbol', ']')
 
-        # Get the memory space pointer for this variable
-        mm_ptr = self.get_stack_space(var_size)
+        # Get the memory space pointer for this variable.
+        mm_ptr = self.get_mm(var_size, is_global=is_global, is_param=is_param)
 
         # The declaration was valid, add the identifier to the table
         id = Identifier(var_token.value, id_type, var_size, None, mm_ptr)
 
-        if id_table_add:
+        if not is_param:
             try:
                 self._ids.add(id, is_global=is_global)
             except ParserNameError:
@@ -508,8 +556,8 @@ class Parser(Scanner, CodeGenerator):
         Arguments:
             is_global: Denotes if the procedure is to be globally scoped.
         """
-        self._parse_procedure_header(is_global=is_global)
-        self._parse_procedure_body()
+        id = self._parse_procedure_header(is_global=is_global)
+        self._parse_procedure_body(id)
 
         return
 
@@ -539,12 +587,16 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('symbol', ')')
 
-        id = Identifier(id_name, 'procedure', None, params, None)
+        # Generate procedure label. This will be stored with the identifier
+        # in place of the mm_ptr attribute since it will not be used
+        label_id = self.get_label_id()
+
+        id = Identifier(id_name, 'procedure', None, params, label_id)
 
         try:
             # Add the procedure identifier to the parent and its own table
             self._ids.add(id, is_global=is_global)
-            self._ids.push_scope()
+            self._ids.push_scope(id.name)
             self._ids.add(id)
         except ParserNameError as e:
             self._name_error('name already declared at this scope', id_name,
@@ -558,9 +610,17 @@ class Parser(Scanner, CodeGenerator):
                 self._name_error('name already declared at global scope',
                         param.id.name, id_line)
 
-        return
+        # Define the entry point for the function w/ unique identifier
+        self.generate('%s_%d:' % (id.name, id.mm_ptr))
+        self.tab_push()
 
-    def _parse_procedure_body(self):
+        # Define the begining of the function body
+        self.generate('goto %s_%d_begin;' % (id.name, id.mm_ptr))
+        self.generate('')
+
+        return id
+
+    def _parse_procedure_body(self, id):
         """<procedure_body> (Protected)
 
         Parses the <procedure_body> language structure.
@@ -570,15 +630,38 @@ class Parser(Scanner, CodeGenerator):
                 'begin'
                     ( <statement> ';' )*
                 'end' 'procedure'
+
+        Arguments:
+            id: The identifier object for the procedure.
         """
+        local_var_size = 0
+
+        # Reset the local pointer for the local variables.
+        self.reset_local_ptr()
+        self.reset_param_ptr()
+
+        # Accept any declarations
         while not self._accept('keyword', 'begin'):
             try:
-                self._parse_declaration()
+                size = self._parse_declaration()
+
+                # If this was a local var, allocate space for it
+                if size is not None:
+                    local_var_size += size
             except ParserError:
                 self._resync_at_token('symbol', ';')
 
             self._match('symbol', ';')
 
+        # Define the function begin point
+        self.generate('%s_%d_begin:' % (id.name, id.mm_ptr))
+        self.tab_push()
+
+        if local_var_size != 0:
+            self.comment('Allocating space for local variables', self.debug)
+            self.generate('R[SP] = R[SP] - %d;' % local_var_size)
+
+        # Accept any statements
         while not self._accept('keyword', 'end'):
             try:
                 self._parse_statement()
@@ -589,7 +672,18 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('keyword', 'procedure')
 
+        # Smash the local stack
+        self.comment('Movin SP to FP (retun address)', self.debug)
+        self.generate('R[SP] = R[FP];')
+
+        # Goto the return label to exit the procedure
+        self.comment('Return to calling functon', self.debug)
+        self.generate('goto *(void*)MM[R[FP]];')
+        self.generate('')
+
+        self.tab_pop()
         self._ids.pop_scope()
+        self.tab_pop()
 
         return
 
@@ -610,12 +704,15 @@ class Parser(Scanner, CodeGenerator):
             An completed list of all Parameter namedtuples associated
             with the procedure.
         """
+        # Get one parameter
         param = self._parse_parameter()
         params.append(param)
 
+        # Get all following parameters
         if self._accept('symbol', ','):
             params = self._parse_parameter_list(params)
 
+        # All parameters found will be returned in the list
         return params
 
     def _parse_parameter(self):
@@ -626,7 +723,10 @@ class Parser(Scanner, CodeGenerator):
             <parameter> ::=
                 <variable_declaration> ( 'in' | 'out' )
         """
-        id = self._parse_variable_declaration(id_table_add=False)
+        # Return the id object, but don't add it to the identifier table
+        # yet or get a memory location for it. This will be done when the
+        # procedure is called
+        id = self._parse_variable_declaration(is_param=True)
 
         direction = None
 
@@ -652,7 +752,8 @@ class Parser(Scanner, CodeGenerator):
                 <procedure_call>
         """
         if self._accept('keyword', 'return'):
-            pass
+            # Goto the return label to exit the procedure/program
+            self.generate('goto *(void*)MM[R[FP]];')
         elif self._first_if_statement():
             self._parse_if_statement()
         elif self._first_loop_statement():
@@ -692,26 +793,51 @@ class Parser(Scanner, CodeGenerator):
         id_name = self._current.value
         dest_type = self._parse_destination()
 
+        # Grab the last register used in case this variable is an array
         index_reg = self.get_reg(inc=False)
+
+        # Check to make sure this is a valid identifier
         id_obj = self._ids.find(id_name)
 
         self._match('symbol', ':=')
 
         expr_type = self._parse_expression()
 
+        # Get the register used for the expression
         expr_reg = self.get_reg(inc=False)
 
         if dest_type != expr_type:
             self._type_error(dest_type, expr_type, line)
 
-        id_addr = self.get_reg()
+        # Get a new register to calculate the main memory addr of this id
+        id_reg = self.get_reg()
 
-        self.generate('R[%d] = %d;' % (id_addr, id_obj.mm_ptr))
+        # If identifier is param, mm_ptr will be the parameter offset
+        # If identifier is local, mm_ptr will be the local offset
+        # If identifier is global, mm_ptr is the direct memory space
+        self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
 
         if id_obj.size is not None:
-            self.generate('R[%d] = R[%d] + R[%d];' % (id_addr, id_addr, index_reg))
+            self.generate('R[%d] = R[%d] + R[%d];' % (id_reg, id_reg, index_reg))
 
-        self.generate('MM[R[%d]] = R[%d];' % (id_addr, expr_reg))
+        if self._ids.is_param(id_obj.name):
+            # Make sure that this is an 'in' parameter only
+            direction = self._ids.get_param_direction(id_obj.name)
+            if direction != 'out':
+                self._type_error('\'out\' param',
+                        '\'%s\' param' % direction, line)
+                raise ParserTypeError()
+
+            # Calculate the parameter location
+            self.comment('Param referenced', self.debug)
+            self.generate('R[%d] = R[FP] + 1 + R[%d];' % (id_reg, id_reg))
+        elif not self._ids.is_global(id_obj.name):
+            self.comment('Local var referenced', self.debug)
+            self.generate('R[%d] = R[FP] - R[%d];' % (id_reg, id_reg))
+        else:
+            self.comment('Global var referenced', self.debug)
+
+        self.generate('MM[R[%d]] = R[%d];' % (id_reg, expr_reg))
 
         return
 
@@ -875,6 +1001,8 @@ class Parser(Scanner, CodeGenerator):
         id_line = self._current.line
         id_type = None
 
+        out_names = []
+
         self._match('identifier')
 
         try:
@@ -891,7 +1019,7 @@ class Parser(Scanner, CodeGenerator):
         self._match('symbol', '(')
 
         if not self._check('symbol', ')'):
-            num_args = self._parse_argument_list(id.params)
+            (num_args, out_names) = self._parse_argument_list(id.params)
 
             # Make sure that too few arguments are not used
             if num_args < len(id.params):
@@ -901,9 +1029,62 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('symbol', ')')
 
+        # Save the FP to the stack. Set next FP to return address
+        self.comment('Setting caller FP', self.debug)
+        self.generate('R[SP] = R[SP] - 1;')
+        self.generate('MM[R[SP]] = R[FP];')
+        self.comment('Setting return addr (current FP)', self.debug)
+        self.generate('R[SP] = R[SP] - 1;')
+        self.generate('R[FP] = R[SP];')
+
+        # Generate a new call number so multiple calls do not cause collisions
+        call_number = self.get_unique_call_id()
+
+        # Push the return addr onto the stack
+        self.generate('MM[R[SP]] = (int)&&%s_%d_%d;' %
+                (id.name, id.mm_ptr, call_number))
+                
+        # Make the jump to the function call
+        self.generate('goto %s_%d;' % (id.name, id.mm_ptr))
+
+        # Generate the return label
+        self.generate('%s_%d_%d:' % (id.name, id.mm_ptr, call_number))
+
+        # The SP now points to the return address. Restore the old FP
+        self.comment('Restore caller FP', self.debug)
+        self.generate('R[SP] = R[SP] + 1;')
+        self.generate('R[FP] = MM[R[SP]];')
+
+        # Pop parameters off the stack
+        for index, param in enumerate(id.params):
+            out_name = out_names[index]
+
+            self.comment('Popping \'%s\' param off the stack' % param.id.name,
+                    self.debug)
+                    
+            size = param.id.size if param.id.size is not None else 1
+
+            for index in range(size):
+                # Move to the next memory space
+                self.generate('R[SP] = R[SP] + 1;')
+
+                if param.direction == 'out':
+                    print('%s an out param' % param.id.name)
+                    print('\tmoving to %s' % out_name)
+
+                    out_id = self._ids.find(out_name)
+
+                    if self._ids.is_global(out_name):
+                        self.generate('MM[%d] = MM[R[SP]];' % out_id.mm_ptr)
+                    else:
+                        self.generate('MM[R[FP]-%d] = MM[R[SP]];' % out_id.mm_ptr)
+
+        self.comment('Move to caller local stack', self.debug)
+        self.generate('R[SP] = R[SP] + 1;')
+
         return
 
-    def _parse_argument_list(self, params, index=0):
+    def _parse_argument_list(self, params, index=0, out_names=[]):
         """<argument_list> (Protected)
 
         Parses <argument_list> language structure.
@@ -914,14 +1095,18 @@ class Parser(Scanner, CodeGenerator):
 
         Arguments:
             params: A list of Parameter namedtuple objects allowed in the
-                procedure call
+                procedure call.
             index: The index in params with which to match the found param.
                 (Default: 0)
+            out_names: A list of identifier names that are being used in this
+                procedure call and must be written back.
 
         Returns:
-            The number of arguments encountered.
+            A tuple (index, out_names) consisting of the number of arguments
+            encountered and a list of the identifiers used to write back.
         """
         line = self._current.line
+        arg_type = None
 
         # Make sure that too many arguments are not used
         if index > len(params) - 1:
@@ -931,7 +1116,17 @@ class Parser(Scanner, CodeGenerator):
 
         param = params[index]
 
-        arg_type = self._parse_expression()
+        if param.direction == 'out':
+            arg_type = self._parse_name()
+
+            # Save the identifier name so we know where to write the value
+            out_names.append(self._previous.value)
+        elif param.direction == 'in':
+            arg_type = self._parse_expression()
+            out_names.append(None)
+
+        # Get the last reg assignment in the expr. This is argument's register
+        expr_reg = self.get_reg(inc=False)
 
         if arg_type != param.id.type:
             self._type_error(param.id.type, arg_type, line)
@@ -939,9 +1134,21 @@ class Parser(Scanner, CodeGenerator):
         index += 1
 
         if self._accept('symbol', ','):
-            index = self._parse_argument_list(params, index)
+            (index, out_names) = self._parse_argument_list(params, index,
+                    out_names)
 
-        return index
+        # Push the parameters onto the stack in reverse order. The last param
+        # will reach this point first
+        self.comment('Pushing argument onto the stack', self.debug)
+
+        if param.id.size is not None:
+            self.generate('R[SP] = R[SP] - %d;' % param.id.size)
+        else:
+            self.generate('R[SP] = R[SP] - 1;')
+
+        self.generate('MM[R[SP]] = R[%d];' % expr_reg)
+
+        return (index, out_names)
 
     def _parse_destination(self):
         """<destination> (Protected)
@@ -1002,7 +1209,12 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             The type value of the expression.
         """
+        self.comment('Parsing expression', self.debug)
+
         negate = False
+
+        # Holds the register number of the expression result
+        result = 0
 
         if self._accept('keyword', 'not'):
             negate = True
@@ -1010,15 +1222,14 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_arith_op()
 
-        operand1 = self.get_reg(inc=False)
-
         if negate and type not in ['integer', 'bool']:
             self._type_error('integer or bool', type, line)
             raise ParserTypeError()
 
         while True:
-            operation = ''
+            operand1 = self.get_reg(inc=False)
 
+            operation = ''
             if self._accept('symbol', '&'):
                 operation = '&'
             elif self._accept('symbol', '|'):
@@ -1042,7 +1253,7 @@ class Parser(Scanner, CodeGenerator):
                     operation)
 
             if negate:
-                self.generate('R[%d] = ~R[%d];' % (self.get_reg(), result))
+                self.generate('R[%d] = ~R[%d];' % (result, result))
 
         return type
 
@@ -1062,9 +1273,9 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_relation()
 
-        operand1 = self.get_reg(inc=False)
-
         while True:
+            operand1 = self.get_reg(inc=False)
+
             operation = ''
             if self._accept('symbol', '+'):
                 operation = '+'
@@ -1080,7 +1291,7 @@ class Parser(Scanner, CodeGenerator):
             next_type = self._parse_relation()
 
             operand2 = self.get_reg(inc=False)
-
+            
             if next_type not in ['integer', 'float']:
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
@@ -1109,13 +1320,12 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_term()
 
-        operand1 = self.get_reg(inc=False)
-
         # Check for relational operators. Note that relational operators
         # are only valid for integers or booleans
         while True:
-            operation = ''
+            operand1 = self.get_reg(inc=False)
 
+            operation = ''
             if self._accept('symbol', '<'):
                 operation = '<'
             elif self._accept('symbol', '>'):
@@ -1163,13 +1373,12 @@ class Parser(Scanner, CodeGenerator):
         line = self._current.line
         type = self._parse_factor()
 
-        operand1 = self.get_reg(inc=False)
-
         # Check for multiplication or division operators. Note that these
         # operators are only valid for integer or float values
         while True:
-            operation = ''
+            operand1 = self.get_reg(inc=False)
 
+            operation = ''
             if self._accept('symbol', '*'):
                 operation = '*'
             elif self._accept('symbol', '/'):
@@ -1211,6 +1420,7 @@ class Parser(Scanner, CodeGenerator):
             The type value of the expression.
         """
         type = None
+        line = self._current.line
 
         if self._accept('symbol', '('):
             type = self._parse_expression()
@@ -1230,63 +1440,15 @@ class Parser(Scanner, CodeGenerator):
             self.generate('R[%d] = 0;' % (self.get_reg()))
         elif self._accept('symbol', '-'):
             if self._first_name():
-                # Get the name, parse it
-                id_name = self._current.value
                 type = self._parse_name()
-
-                index_reg = self.get_reg(inc=False)
-
-                # Get the identifier object associated with the name
-                id_obj = self._ids.find(id_name)
-
-                id_reg = self.get_reg()
-                self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
-
-                if id_obj.size is not None:
-                    self.generate('R[%d] = R[%d] + R[%d];' %
-                            (id_reg, id_reg, index_reg))
-
-                self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
             elif self._check('integer') or self._check('float'):
-                type = self._parse_number()
-                number = self._previous.value
-
-                if type == 'integer':
-                    self.generate('R[%d] = -%s;' % (self.get_reg(), number))
-                else:
-                    self.generate('R_FLOAT_1 = -%s;' % number)
-                    self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));'
-                            % self.get_reg())
+                type = self._parse_number(negate=True)
             else:
                 self._syntax_error('variable name, integer, or float')
         elif self._first_name():
-            # Get the name, parse it
-            id_name = self._current.value
             type = self._parse_name()
-
-            index_reg = self.get_reg(inc=False)
-
-            # Get the identifier object associated with the name
-            id_obj = self._ids.find(id_name)
-
-            id_reg = self.get_reg()
-            self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
-
-            if id_obj.size is not None:
-                self.generate('R[%d] = R[%d] + R[%d];' %
-                        (id_reg, id_reg, index_reg))
-
-            self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
         elif self._check('integer') or self._check('float'):
-            type = self._parse_number()
-            number = self._previous.value
-
-            if type == 'integer':
-                self.generate('R[%d] = %s;' % (self.get_reg(), number))
-            else:
-                self.generate('R_FLOAT_1 = %s;' % number)
-                self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));'
-                        % self.get_reg())
+            type = self._parse_number(negate=False)
         else:
             self._syntax_error('factor')
 
@@ -1343,9 +1505,43 @@ class Parser(Scanner, CodeGenerator):
         elif id.size is not None:
             self._runtime_error('%s: array requires index' % id_name, id_line)
 
+        # Generate code for the identifier encountered
+        index_reg = self.get_reg(inc=False)
+
+        # Get a register to store the address calculations
+        id_reg = self.get_reg()
+
+        # If identifier is param, mm_ptr will be the parameter offset
+        # If identifier is local, mm_ptr will be the local offset
+        # If identifier is global, mm_ptr is the direct memory space
+        self.generate('R[%d] = %d;' % (id_reg, id.mm_ptr))
+
+        if id.size is not None:
+            self.generate('R[%d] = R[%d] + R[%d];' %
+                    (id_reg, id_reg, index_reg))
+
+        if self._ids.is_param(id.name):
+            # Make sure that this is an 'in' parameter only
+            direction = self._ids.get_param_direction(id.name)
+            if direction != 'in':
+                self._type_error('\'in\' param',
+                        '\'%s\' param' % direction, line)
+                raise ParserTypeError()
+
+            # Calculate the parameter location
+            self.comment('Param referenced', self.debug)
+            self.generate('R[%d] = R[FP] + 1 + R[%d];' % (id_reg, id_reg))
+        elif not self._ids.is_global(id.name):
+            self.comment('Local var referenced', self.debug)
+            self.generate('R[%d] = R[FP] - R[%d];' % (id_reg, id_reg))
+        else:
+            self.comment('Global var referenced', self.debug)
+
+        self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
+
         return id_type
 
-    def _parse_number(self):
+    def _parse_number(self, negate=False):
         """Parse Number (Protected)
 
         Parses the <number> language structure.
@@ -1353,10 +1549,30 @@ class Parser(Scanner, CodeGenerator):
             <number> ::=
                 [0-9][0-9_]*[.[0-9_]*]
 
+        Arguments:
+            negate: Determines if the number should be negated or not.
         Returns:
             The type of the parsed number.
         """
+        number = self._current.value
+        type = self._current.type
+
         if not self._accept('integer') and not self._accept('float'):
             self._syntax_error('number')
 
-        return self._previous.type
+        reg = self.get_reg()
+
+        if type == 'integer':
+            if negate:
+                self.generate('R[%d] = -%s;' % (reg, number))
+            else:
+                self.generate('R[%d] = %s;' % (reg, number))
+        else:
+            if negate:
+                self.generate('R_FLOAT_1 = -%s;' % number)
+            else:
+                self.generate('R_FLOAT_1 = %s;' % number)
+
+            self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));' % reg)
+
+        return type
