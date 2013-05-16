@@ -9,7 +9,7 @@ void getString(char* my_string) {
 }
 
 void putString(char* my_string) {
-    printf("%s", my_string);
+    printf("%s\n", my_string);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -23,7 +23,7 @@ int getBool() {
 }
 
 void putBool(int my_bool) {
-    printf("%s", my_bool ? "true" : "false");
+    printf("%s\n", my_bool ? "true" : "false");
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -37,7 +37,7 @@ int getInteger() {
 }
 
 void putInteger(int my_integer) {
-    printf("%d", my_integer);
+    printf("%d\n", my_integer);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -51,5 +51,5 @@ float getFloat() {
 }
 
 void putFloat(float my_float) {
-    printf("%f", my_float);
+    printf("%f\n", my_float);
 }

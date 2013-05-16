@@ -82,6 +82,9 @@ class Parser(Scanner, CodeGenerator):
         self._advance_token()
         self._advance_token()
 
+        # Add all runtime functions
+        self._add_runtime()
+
         # Begin parsing the root <program> language structure
         try:
             self._parse_program()
@@ -101,6 +104,31 @@ class Parser(Scanner, CodeGenerator):
             self.rollback()
 
         return True
+
+    def _add_runtime(self):
+        """Add Runtime Functions
+
+        Adds each runtime function to the list of global functions.
+        """
+        # The runtime_functions list is defined in the CodeGenerator class
+        for func_name in iter(self.runtime_functions):
+            # Get all parameters for these functions
+            param_ids = []
+            param_list = self.runtime_functions[func_name]
+            for index, param in enumerate(param_list):
+                # Build up each param, add it to the list
+                id_obj = Identifier(name=param[0], type=param[1], size=None,
+                        params=None, mm_ptr=(index+1))
+                p_obj = Parameter(id=id_obj, direction=param[2])
+                param_ids.append(p_obj)
+
+            # Build the function's identifier
+            func_id = Identifier(name=func_name, type='procedure', size=None, 
+                    params=param_ids, mm_ptr=1)
+
+            self._ids.add(func_id, is_global=True)
+
+        return
 
     def _warning(self, msg, line, prefix='Warning'):
         """Print Parser Warning Message (Protected)
@@ -1069,9 +1097,6 @@ class Parser(Scanner, CodeGenerator):
                 self.generate('R[SP] = R[SP] + 1;')
 
                 if param.direction == 'out':
-                    print('%s an out param' % param.id.name)
-                    print('\tmoving to %s' % out_name)
-
                     out_id = self._ids.find(out_name)
 
                     if self._ids.is_global(out_name):

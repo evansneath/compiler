@@ -1,0 +1,17 @@
+program codegen_test is
+
+    integer result;
+
+    // Test a procedure declaration. Will be called later
+    procedure increment (integer val in, integer result out)
+    begin
+        result := val + 1;
+    end procedure;
+
+begin
+
+    result := 0;
+    increment(41, result);
+    putInteger(result);
+
+end program

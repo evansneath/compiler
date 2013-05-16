@@ -49,11 +49,11 @@ class CodeGenerator(object):
         self._reg_size = 2048
 
         # Holds stack pointer register, frame pointer register
-        self._SP = 0
-        self._FP = 1
+        self._SP = 1
+        self._FP = 2
 
         # Holds the pointer to the lowest unused register for allocation
-        self._reg = 2
+        self._reg = 3
 
         # Holds the heap pointer to store the current available loc in heap
         self._heap_ptr = 0
@@ -74,6 +74,17 @@ class CodeGenerator(object):
 
         # Holds an integer to distinguish multiple calls of a function
         self._unique_id = 0
+
+        self.runtime_functions = {
+            'getString': [('my_string', 'string', 'out')],
+            'putString': [('my_string', 'string', 'in')],
+            'getBool': [('my_bool', 'bool', 'out')],
+            'putBool': [('my_bool', 'bool', 'in')],
+            'getInteger': [('my_integer', 'integer', 'out')],
+            'putInteger': [('my_integer', 'integer', 'in')],
+            'getFloat': [('my_float', 'float', 'out')],
+            'putFloat': [('my_float', 'float', 'in')],
+        }
 
         return
 
@@ -134,6 +145,20 @@ class CodeGenerator(object):
             '',
             '    // Jump to the program exit',
             '    goto *(void*)MM[R[FP]];',
+            '',
+            '// Runtime functions are defined here',
+            'putInteger_1:',
+            '    R[0] = MM[R[FP]+2];',
+            '    putInteger(R[0]);',
+            '    R[0] = MM[R[FP]];',
+            '    goto *(void*)R[0];',
+            '',
+            'getInteger_1:',
+            '    R[0] = getInteger();',
+            '    MM[R[FP]+2] = R[0];',
+            '    R[0] = MM[R[FP]];',
+            '    goto *(void*)R[0];',
+            '',
             '}',
         ]
 
