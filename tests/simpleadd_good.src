@@ -1,0 +1,19 @@
+program simpleadd is
+
+    integer int1;
+    integer myint2;
+    integer result;
+
+begin
+
+    // Get the first input
+    getInteger(int1);
+
+    // Get the second input
+    getInteger(myint2);
+
+    // Calculate the sum
+    result := int1 + myint2;
+    putInteger(result);
+
+end program

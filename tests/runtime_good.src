@@ -1,8 +1,10 @@
 program codegen_test is
 
-    integer result;
+    integer testint;
+    string teststring;
+    bool testbool;
+    float testfloat;
 
-    // Test a procedure declaration. Will be called later
     procedure increment (integer val in, integer result out)
     begin
         result := val + 1;
@@ -10,8 +12,46 @@ program codegen_test is
 
 begin
 
-    result := 0;
-    increment(41, result);
-    putInteger(result);
+    ////////////////////////////////////////////
+    // INTEGER TEST
+
+    //testint := 0;
+    //increment(41, testint);
+
+    //putString("41 plus 1 is...");
+    //putInteger(testint);
+
+    //putString("Enter an integer");
+    //getInteger(testint);
+    //putString("You entered...");
+    //putInteger(testint);
+
+    ////////////////////////////////////////////
+    // BOOL TEST
+
+    //putString("Enter a boolean value 0 or 1");
+    //getBool(testbool);
+    //putString("You entered...");
+    //putBool(testbool);
+
+    ////////////////////////////////////////////
+    // FLOAT TEST
+
+    //testfloat := 4.5;
+    //putFloat(testfloat);
+    //putFloat(1414.1414);
+
+    //putString("Enter a float");
+    //getFloat(testfloat);
+    //putString("You entered...");
+    //putFloat(testfloat);
+
+    ////////////////////////////////////////////
+    // STRING TEST
+
+    putString("Enter a string");
+    getString(teststring);
+    putString("You entered...");
+    putString(teststring);
 
 end program

@@ -51,5 +51,5 @@ float getFloat() {
 }
 
 void putFloat(float my_float) {
-    printf("%f\n", my_float);
+    printf("%f", my_float);
 }

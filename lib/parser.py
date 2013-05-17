@@ -126,6 +126,7 @@ class Parser(Scanner, CodeGenerator):
             func_id = Identifier(name=func_name, type='procedure', size=None, 
                     params=param_ids, mm_ptr=1)
 
+            # Add the function to the global scope of the identifier table
             self._ids.add(func_id, is_global=True)
 
         return
@@ -1047,7 +1048,8 @@ class Parser(Scanner, CodeGenerator):
         self._match('symbol', '(')
 
         if not self._check('symbol', ')'):
-            (num_args, out_names) = self._parse_argument_list(id.params)
+            (num_args, out_names) = self._parse_argument_list(id.params,
+                    index=0, out_names=out_names)
 
             # Make sure that too few arguments are not used
             if num_args < len(id.params):
