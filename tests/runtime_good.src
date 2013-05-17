@@ -1,7 +1,11 @@
 program codegen_test is
 
     integer testint;
+
     string teststring;
+    string teststring2;
+    string teststring3;
+
     bool testbool;
     float testfloat;
 
@@ -15,16 +19,16 @@ begin
     ////////////////////////////////////////////
     // INTEGER TEST
 
-    //testint := 0;
-    //increment(41, testint);
+    testint := 0;
+    increment(41, testint);
 
-    //putString("41 plus 1 is...");
-    //putInteger(testint);
+    putString("41 plus 1 is...");
+    putInteger(testint);
 
-    //putString("Enter an integer");
-    //getInteger(testint);
-    //putString("You entered...");
-    //putInteger(testint);
+    putString("Enter an integer");
+    getInteger(testint);
+    putString("You entered...");
+    putInteger(testint);
 
     ////////////////////////////////////////////
     // BOOL TEST
@@ -49,9 +53,27 @@ begin
     ////////////////////////////////////////////
     // STRING TEST
 
-    putString("Enter a string");
-    getString(teststring);
-    putString("You entered...");
-    putString(teststring);
+    //putString("Enter a string");
+    //getString(teststring);
+    //putString("You entered...");
+    //putString(teststring);
 
+    //putString("Enter a string");
+    //getString(teststring2);
+    //putString("You entered...");
+    //putString(teststring2);
+
+    //putString("Enter a string");
+    //getString(teststring3);
+    //putString("You entered...");
+    //putString(teststring3);
+
+    //putString("This is the first string");
+    //putString(teststring);
+
+    //putString("This is the second string");
+    //putString(teststring2);
+
+    //putString("This is the third string");
+    //putString(teststring3);
 end program

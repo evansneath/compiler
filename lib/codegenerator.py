@@ -47,18 +47,14 @@ class CodeGenerator(object):
         # Holds allocated size of main memory and num registers
         self._mm_size = 65536
         self._reg_size = 2048
-        self._buf_size = 1024
+        self._buf_size = 256
 
         # Holds stack pointer register, frame pointer register
         self._SP = 1
         self._FP = 2
-        self._HP = 3
 
         # Holds the pointer to the lowest unused register for allocation
         self._reg = 4
-
-        # Holds the heap pointer to store the current available loc in heap
-        self._heap_ptr = 0
 
         # Holds the local memory pointer which determines the offset from the
         # frame pointer in the current scope. This offset starts at 1.
@@ -77,6 +73,7 @@ class CodeGenerator(object):
         # Holds an integer to distinguish multiple calls of a function
         self._unique_id = 0
 
+        # Holds the details of the runtime functions
         self.runtime_functions = {
             'getString': [('my_string', 'string', 'out')],
             'putString': [('my_string', 'string', 'in')],
@@ -121,7 +118,6 @@ class CodeGenerator(object):
             '// define register locations of stack/frame ptr',
             '#define SP       %d' % self._SP,
             '#define FP       %d' % self._FP,
-            '#define HP       %d' % self._HP,
             '',
             'int main(void)',
             '{',
@@ -131,7 +127,6 @@ class CodeGenerator(object):
             '',
             'R[SP] = MM_SIZE - 1;',
             'R[FP] = MM_SIZE - 1;',
-            'R[HP] = 0;',
             '',
             '// allocate float registers',
             'float R_FLOAT_1;',
@@ -157,34 +152,37 @@ class CodeGenerator(object):
             '// Runtime functions are defined here',
             'putString_1:',
             '    R[0] = MM[R[FP]+2];',
-            '    putString((char*)R[0]);',
+            '    printf("%s\\n", (char*)R[0]);',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'getString_1:',
-            '    R[0] = getString(STR_BUF);',
+            '    fgets(STR_BUF, BUF_SIZE, stdin);',
+            '    MM[R[FP]+2] = (int)STR_BUF;',
+            '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'putBool_1:',
             '    R[0] = MM[R[FP]+2];',
-            '    putBool(R[0]);',
+            '    printf("%s\\n", R[0] ? "true" : "false");',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'getBool_1:',
-            '    R[0] = getBool();',
+            '    scanf("%d", &R[0]);',
+            '    R[0] = R[0] ? 1 : 0;',
             '    MM[R[FP]+2] = R[0];',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'putInteger_1:',
             '    R[0] = MM[R[FP]+2];',
-            '    putInteger(R[0]);',
+            '    printf("%d\\n", R[0]);',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'getInteger_1:',
-            '    R[0] = getInteger();',
+            '    scanf("%d", &R[0]);',
             '    MM[R[FP]+2] = R[0];',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
@@ -193,13 +191,11 @@ class CodeGenerator(object):
             '    R[0] = MM[R[FP]+2];',
             '    memcpy(&R_FLOAT_1, &R[0], sizeof(float));',
             '    printf("%g\\n", R_FLOAT_1);',
-            '    //putFloat(R_FLOAT_1);',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
             'getFloat_1:',
             '    scanf("%f", &R_FLOAT_1);',
-            '    //R_FLOAT_1 = getFloat();',
             '    memcpy(&R[0], &R_FLOAT_1, sizeof(float));',
             '    MM[R[FP]+2] = R[0];',
             '    R[0] = MM[R[FP]];',
@@ -265,9 +261,6 @@ class CodeGenerator(object):
             # Allocate memory in the global heap space
             var_loc = self._heap_ptr
             self._heap_ptr += mem_needed
-
-            # Move the heap pointer in the generated code
-            self.generate('R[HP] = R[HP] + %d' % mem_needed)
         elif is_param:
             var_loc = self._param_ptr
             self._param_ptr += mem_needed

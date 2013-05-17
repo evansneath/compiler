@@ -35,7 +35,7 @@ positional arguments:
 
 optional arguments:
   -h, --help         show this help message and exit
-  -d, --debug        print debug information
+  -d, --debug        print comments in generated code
   -o OUT, --out OUT  target path for the compiled code
 ```
 

@@ -16,6 +16,7 @@ begin
     add2 := 5; 
 
     add(add1, add2, sum);
+    putInteger(sum);
 
     return;
 

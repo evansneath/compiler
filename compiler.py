@@ -30,7 +30,7 @@ def parse_arguments():
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--debug', help='print debug information',
+    parser.add_argument('-d', '--debug', help='print comments in generated code',
             action='store_true')
     parser.add_argument('source', help='source file to compile')
     parser.add_argument('-o', '--out', help='target path for the compiled code',
@@ -54,7 +54,6 @@ def compile(source, target, debug=False):
     """
     # Define a temporary location for the intermediate C code
     TMP_CODE_FILE = './ir.c'
-    RUNTIME_LIB = './runtime/runtime.c'
 
     # Create a Parser object to parse the inputted source file
     parser = Parser(debug)
@@ -65,7 +64,7 @@ def compile(source, target, debug=False):
         return False
 
     # Set up gcc compilation command
-    gcc_cmd = ['gcc', '-m32', '-o', target, TMP_CODE_FILE, RUNTIME_LIB]
+    gcc_cmd = ['gcc', '-m32', '-o', target, TMP_CODE_FILE]
 
     # Compile the temporary file with gcc. Output to the target location
     if call(gcc_cmd) != 0:
