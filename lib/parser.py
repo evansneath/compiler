@@ -502,7 +502,7 @@ class Parser(Scanner, CodeGenerator):
         var_token = self._match('identifier')
 
         if self._accept('symbol', '['):
-            index_type = self._parse_number()
+            index_type = self._parse_number(generate_code=False)
 
             var_size = self._previous.value
             index_line = self._previous.line
@@ -610,7 +610,7 @@ class Parser(Scanner, CodeGenerator):
         params = []
 
         if not self._check('symbol', ')'):
-            params = self._parse_parameter_list()
+            params = self._parse_parameter_list(params)
 
         self._match('symbol', ')')
 
@@ -1026,6 +1026,7 @@ class Parser(Scanner, CodeGenerator):
         id_type = None
 
         out_names = []
+        num_args = 0
 
         self._match('identifier')
 
@@ -1084,7 +1085,7 @@ class Parser(Scanner, CodeGenerator):
         for index, param in enumerate(id.params):
             out_name = out_names[index]
 
-            self.comment('Popping \'%s\' param off the stack' % param.id.name,
+            self.comment('Popping "%s" param off the stack' % param.id.name,
                     self.debug)
                     
             size = param.id.size if param.id.size is not None else 1
@@ -1097,9 +1098,11 @@ class Parser(Scanner, CodeGenerator):
                     out_id = self._ids.find(out_name)
 
                     if self._ids.is_global(out_name):
-                        self.generate('MM[%d] = MM[R[SP]];' % out_id.mm_ptr)
+                        self.generate('MM[MM_SIZE-1-%d] = MM[R[SP]];' %
+                                (int(out_id.mm_ptr) + index - 1))
                     else:
-                        self.generate('MM[R[FP]-%d] = MM[R[SP]];' % out_id.mm_ptr)
+                        self.generate('MM[R[FP]-%d] = MM[R[SP]];' %
+                                (int(out_id.mm_ptr) + index - 1))
 
         self.comment('Move to caller local stack', self.debug)
         self.generate('R[SP] = R[SP] + 1;')
@@ -1564,7 +1567,7 @@ class Parser(Scanner, CodeGenerator):
 
         return id_type
 
-    def _parse_number(self, negate=False):
+    def _parse_number(self, negate=False, generate_code=True):
         """Parse Number (Protected)
 
         Parses the <number> language structure.
@@ -1574,6 +1577,9 @@ class Parser(Scanner, CodeGenerator):
 
         Arguments:
             negate: Determines if the number should be negated or not.
+            generate_code: Determines if code should be generated for the
+                parsed number or not.
+
         Returns:
             The type of the parsed number.
         """
@@ -1582,6 +1588,9 @@ class Parser(Scanner, CodeGenerator):
 
         if not self._accept('integer') and not self._accept('float'):
             self._syntax_error('number')
+
+        if not generate_code:
+            return type
 
         reg = self.get_reg()
 
