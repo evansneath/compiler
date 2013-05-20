@@ -1,0 +1,34 @@
+program looptest is
+
+    integer result;
+
+    procedure do_loops(integer num_loops in, integer result out)
+        integer counter;
+    begin
+        counter := 0;
+
+        putString("Number of Loops:");
+        putInteger(num_loops);
+
+        for (counter := counter + 1; counter <= num_loops)
+            putString("Current Counter:");
+            putInteger(counter);
+            result := counter;
+        end for;
+     end procedure;
+
+begin
+
+    result := 0;
+
+    do_loops(10, result);
+
+    putString("Expect 10");
+
+    if (result == 10) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
+
+end program

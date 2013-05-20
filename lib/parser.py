@@ -963,16 +963,16 @@ class Parser(Scanner, CodeGenerator):
         self._match('keyword', 'for')
         self._match('symbol', '(')
 
+        label_id = self.get_label_id()
+        self.generate('loop_%d:' % label_id)
+        self.tab_push()
+
         try:
             self._parse_assignment_statement()
         except ParserError:
             self._resync_at_token('symbol', ';')
 
         self._match('symbol', ';')
-
-        label_id = self.get_label_id()
-        self.generate('loop_%d:' % label_id)
-        self.tab_push()
 
         self._parse_expression()
         self._match('symbol', ')')
@@ -1089,7 +1089,7 @@ class Parser(Scanner, CodeGenerator):
                     
             size = param.id.size if param.id.size is not None else 1
 
-            for index in range(size):
+            for index in range(int(size)):
                 # Move to the next memory space
                 self.generate('R[SP] = R[SP] + 1;')
 
@@ -1164,7 +1164,7 @@ class Parser(Scanner, CodeGenerator):
         self.comment('Pushing argument onto the stack', self.debug)
 
         if param.id.size is not None:
-            self.generate('R[SP] = R[SP] - %d;' % param.id.size)
+            self.generate('R[SP] = R[SP] - %d;' % int(param.id.size))
         else:
             self.generate('R[SP] = R[SP] - 1;')
 
@@ -1547,7 +1547,7 @@ class Parser(Scanner, CodeGenerator):
             direction = self._ids.get_param_direction(id.name)
             if direction != 'in':
                 self._type_error('\'in\' param',
-                        '\'%s\' param' % direction, line)
+                        '\'%s\' param' % direction, id_line)
                 raise ParserTypeError()
 
             # Calculate the parameter location

@@ -143,7 +143,7 @@ class CodeGenerator(object):
             'float R_FLOAT_2;',
             '',
             '// allocate space for a string buffer',
-            'char STR_BUF[BUF_SIZE];'
+            'char STR_BUF[BUF_SIZE];',
             '',
         ]
 
@@ -342,7 +342,7 @@ class CodeGenerator(object):
         stack. This is necessary to properly allocate space for the parameters
         as they are being pushed onto the stack.
         """
-        self._param_ptr = 2
+        self._param_ptr = 1
         return
 
     def get_reg(self, inc=True):
