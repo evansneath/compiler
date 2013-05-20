@@ -58,7 +58,7 @@ generation, and runtime libraries.
 ###Software
 
 In determining the implementation language, robustness was chosen over speed as
-the deciding factor for the compiler. Python 3.3 was selected because ease of
+the deciding factor for the compiler. Python 3 was selected because ease of
 use, access to simple dictionary and table libraries, and my own familiarity
 with the language.
 
