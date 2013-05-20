@@ -1,19 +1,23 @@
 program simpleadd is
 
     integer int1;
-    integer myint2;
+    integer int2;
     integer result;
 
 begin
 
     // Get the first input
+    putString("Enter 1st Integer:");
     getInteger(int1);
 
     // Get the second input
-    getInteger(myint2);
+    putString("Enter 2nd Integer:");
+    getInteger(int2);
 
     // Calculate the sum
-    result := int1 + myint2;
+    result := int1 + int2;
+
+    putString("Result:");
     putInteger(result);
 
 end program

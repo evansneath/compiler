@@ -1,22 +1,22 @@
 program codegen_test is
 
-//    integer add1;
-//    integer add2;
-//
-//    float float1;
-//    float float2;
-//
-//    float result1;
-//
-//    string hello;
-//
-//    integer sum[2];
-//    integer result;
-//
-//    bool thisistrue;
-//    bool thisisfalse;
+    integer count;
 
+    integer add1;
+    integer add2;
+
+    float float1;
+    float float2;
+
+    float result1;
+
+    string hello;
+
+    integer sum[2];
     integer result;
+
+    bool thisistrue;
+    bool thisisfalse;
 
     // Test a procedure declaration. Will be called later
     procedure increment (integer val in, integer result out)
@@ -31,37 +31,42 @@ begin
     result := 0;
     increment(4 + 7 + 3, result);
 
-//    add1 := 1;
-//    add2 := 5; 
-//
-//    float1 := 1.1;
-//    float2 := 2.;
-//
-//    result1 := float1 + float2;
-//    result1 := float1 * add1;
-//    
-//    sum[0] := 1 + 5;
-//    sum[1] := add1 + add2;
-//
-//    if (sum[1] == add2) then
-//        result := 1;
-//    else
-//        result := 0;
-//    end if;
-//
-//     Set 'count' to 10 the long way
-//    for (count := 0; count < 10)
-//        count := count + 1;
-//
-//        if (count == 5) then
-//            // Half way there. Print a message here eventually
-//            result := 2;
-//        end if;
-//    end for;
-//
-//    //hello := "WORLD";
-//
-//    //thisistrue := not true & false;
-//    //thisisfalse := not false | true;
+    add1 := 1;
+    add2 := 5; 
+
+    float1 := 1.1;
+    float2 := 2.;
+
+    result1 := float1 + float2;
+    result1 := float1 * add1;
+    
+    sum[0] := 1 + 5;
+    sum[1] := add1 + add2;
+
+    if (sum[0] == sum[1]) then
+        result := 1;
+    else
+        result := 0;
+    end if;
+
+    putString("Expect 'result' is 1");
+    if (result == 1) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
+
+    // Set 'count' to 10 the long way
+    putString("Let's count to 10");
+
+    count := 0;
+    for (count := count + 1; count <= 10)
+        putInteger(count);
+
+        if (count == 5) then
+            // Half way there. Print a message
+            putString("We're half way there");
+        end if;
+    end for;
 
 end program

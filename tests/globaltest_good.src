@@ -1,21 +1,31 @@
 // SCOPE TEST PROGRAM
 program scope_test is
     global integer my_global_int;
-    integer result;
+    global integer result;
 
-    procedure increment_global(integer result out)
+    global procedure increment_global()
     begin
         result := my_global_int + 1;
-        return;
+    end procedure;
+
+    procedure calls_increment_global()
+    begin
+        // See if we can call a global procedure from this scope
+        increment_global();
     end procedure;
 
 begin
     my_global_int := 9;
     result := 0;
 
-    increment_global(result);
+    calls_increment_global();
+
     putString("Expect 10");
-    putInteger(result);
+    if (result == 10) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
 
     return;
 

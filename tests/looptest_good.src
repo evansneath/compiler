@@ -1,8 +1,9 @@
 program looptest is
 
     integer result;
+    global integer num_loops;
 
-    procedure do_loops(integer num_loops in, integer result out)
+    procedure do_loops(integer result out)
         integer counter;
     begin
         counter := 0;
@@ -20,8 +21,9 @@ program looptest is
 begin
 
     result := 0;
+    num_loops := 10;
 
-    do_loops(10, result);
+    do_loops(result);
 
     putString("Expect 10");
 
