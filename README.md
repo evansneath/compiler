@@ -3,7 +3,7 @@ Compiler
 
 ##Description
 A single-pass, recursive decent `LL(1)` compiler written by hand for a made-up.
-language. This compiler is written entirely in Python 3.3 and uses the `gcc`
+language. This compiler is written entirely in Python 3 and uses the `gcc`
 compiler to finish compilation of the generated intermediate C representation.
 
 ##Author
@@ -16,7 +16,7 @@ This software licensed under the
 ##Dependencies
 In order to run, this software requires the following dependencies:
 
-* [Python 3.3](http://python.org/download/releases/3.3.2/)
+* [Python 3](http://python.org/download/releases/3.3.2/)
 
 ##Progress
 
