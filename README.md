@@ -16,7 +16,7 @@ This software licensed under the
 ##Dependencies
 In order to run, this software requires the following dependencies:
 
-* [Python 3.3](http://python.org/download/releases/3.3.0/)
+* [Python 3.3](http://python.org/download/releases/3.3.2/)
 
 ##Progress
 
