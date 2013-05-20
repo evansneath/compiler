@@ -300,13 +300,13 @@ manually at the start of parsing.
 * Expressions are strongly typed and types must match. Howerever, there is
    automatic conversion in the arithmetic operators to allow any mixing between
    integers and floats. Furthermore, the relational operators can compare
-   booleans with integers (booleans are converted to integers as false => 0,
-   true => 1).
+   booleans with integers (booleans are converted to integers as `false = 0`,
+   `true = 1`).
 * The type signatures of a procedure's arguments must match exactly their
    parameter declaration.
-* Arithmetic operations ('+', '-', '*', '/' '&' '|') are defined for integers
-   and floats only. The bitwise AND ('&'), bitwise OR ('|') and bitwise NOT
-   ('not') operators are valid only on variables of type integer.
+* Arithmetic operations (`+`, `-`, `*`, `/` `&` `|`) are defined for integers
+   and floats only. The bitwise AND (`&`), bitwise OR (`|`) and bitwise NOT
+   (`not`) operators are valid only on variables of type integer.
 * Relational operations are defined for integers and booleans. Only comparisons
    between the compatible types is possible. Relational operations return a
    boolean result.
