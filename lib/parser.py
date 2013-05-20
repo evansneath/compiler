@@ -100,8 +100,6 @@ class Parser(Scanner, CodeGenerator):
 
         if not self._has_errors:
             self.commit()
-        else:
-            self.rollback()
 
         return True
 
@@ -518,7 +516,7 @@ class Parser(Scanner, CodeGenerator):
             self._match('symbol', ']')
 
         # Get the memory space pointer for this variable.
-        mm_ptr = self.get_mm(var_size, is_global=is_global, is_param=is_param)
+        mm_ptr = self.get_mm(var_size, is_param=is_param)
 
         # The declaration was valid, add the identifier to the table
         id = Identifier(var_token.value, id_type, var_size, None, mm_ptr)
@@ -526,8 +524,8 @@ class Parser(Scanner, CodeGenerator):
         if not is_param:
             try:
                 self._ids.add(id, is_global=is_global)
-            except ParserNameError:
-                self._name_error('name already declared at this scope',
+            except ParserNameError as e:
+                self._name_error(str(e),
                         var_token.value, var_token.line)
 
         return id
@@ -701,13 +699,8 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('keyword', 'procedure')
 
-        # Smash the local stack
-        self.comment('Movin SP to FP (retun address)', self.debug)
-        self.generate('R[SP] = R[FP];')
-
-        # Goto the return label to exit the procedure
-        self.comment('Return to calling functon', self.debug)
-        self.generate('goto *(void*)MM[R[FP]];')
+        # Generate code to jump back to the caller scope
+        self.generate_return(self.debug)
         self.generate('')
 
         self.tab_pop()
@@ -782,7 +775,7 @@ class Parser(Scanner, CodeGenerator):
         """
         if self._accept('keyword', 'return'):
             # Goto the return label to exit the procedure/program
-            self.generate('goto *(void*)MM[R[FP]];')
+            self.generate_return(self.debug)
         elif self._first_if_statement():
             self._parse_if_statement()
         elif self._first_loop_statement():
@@ -847,7 +840,8 @@ class Parser(Scanner, CodeGenerator):
         self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
 
         if id_obj.size is not None:
-            self.generate('R[%d] = R[%d] + R[%d];' % (id_reg, id_reg, index_reg))
+            self.generate('R[%d] = R[%d] + R[%d];' %
+                    (id_reg, id_reg, index_reg))
 
         if self._ids.is_param(id_obj.name):
             # Make sure that this is an 'in' parameter only
@@ -865,6 +859,7 @@ class Parser(Scanner, CodeGenerator):
             self.generate('R[%d] = R[FP] - R[%d];' % (id_reg, id_reg))
         else:
             self.comment('Global var referenced', self.debug)
+            self.generate('R[%d] = MM_SIZE - 1 - R[%d];' % (id_reg, id_reg))
 
         self.generate('MM[R[%d]] = R[%d];' % (id_reg, expr_reg))
 
@@ -1535,7 +1530,7 @@ class Parser(Scanner, CodeGenerator):
         # Generate code for the identifier encountered
         index_reg = self.get_reg(inc=False)
 
-        # Get a register to store the address calculations
+        # Get a new register to calculate the main memory addr of this id
         id_reg = self.get_reg()
 
         # If identifier is param, mm_ptr will be the parameter offset
@@ -1563,6 +1558,7 @@ class Parser(Scanner, CodeGenerator):
             self.generate('R[%d] = R[FP] - R[%d];' % (id_reg, id_reg))
         else:
             self.comment('Global var referenced', self.debug)
+            self.generate('R[%d] = MM_SIZE - 1 - R[%d];' % (id_reg, id_reg))
 
         self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
 

@@ -129,8 +129,15 @@ class IdentifierTable(list):
         """
         scope = -1 if not is_global else 0
 
-        if identifier.name in self[scope]:
-            raise ParserNameError()
+        if is_global and len(self) > 2:
+            raise ParserNameError('global name must be defined in program scope')
+
+        if is_global and (identifier.name in self[0] or (len(self) > 1 and
+                identifier.name in self[1])):
+            raise ParserNameError('name already declared at this scope')
+
+        if not is_global and identifier.name in self[-1]:
+            raise ParserNameError('name already declared at this scope')
 
         self[scope][identifier.name] = identifier
 

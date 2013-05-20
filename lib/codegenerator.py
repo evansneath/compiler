@@ -28,11 +28,11 @@ class CodeGenerator(object):
         tab_push: Increases the tab depth by 1 tab (4 spaces).
         tab_pop: Decreases the tab depth by 1 tab (4 spaces).
         commit: Commits all code generation and writesto the destination file.
-        rollback: Wipes all generated code up to this point.
         get_mm: Provides a free memory space for global or local variables.
         get_reg: Provides a free register for intermediate variable use.
         get_label_id: Returns a unique identifier for the procedure call.
         get_unique_call_id: Returns a unique identifier for multiple calls.
+        generate_return: Generates the code for the 'return' operation.
         do_operation: Generates operation code given an operation.
     """
     def __init__(self):
@@ -49,20 +49,23 @@ class CodeGenerator(object):
         self._reg_size = 2048
         self._buf_size = 256
 
-        # Holds stack pointer register, frame pointer register
+        # Holds stack pointer, frame pointer, and heap pointer registers
         self._SP = 1
         self._FP = 2
+        self._HP = 3
 
         # Holds the pointer to the lowest unused register for allocation
         self._reg = 4
 
         # Holds the local memory pointer which determines the offset from the
-        # frame pointer in the current scope. This offset starts at 1.
-        self._local_ptr = 1
+        # frame pointer in the current scope.
+        self._local_ptr = 0
+        self.reset_local_ptr()
 
         # Holds the param memory pointer which determines the offset from the
-        # frame pointer in the current scope. This offset starts at 1.
-        self._param_ptr = 1
+        # frame pointer in the current scope.
+        self._param_ptr = 0
+        self.reset_param_ptr()
 
         # Holds the tabcount of the code. tab_push, tab_pop manipulate this
         self._tab_count = 0
@@ -106,6 +109,8 @@ class CodeGenerator(object):
 
     def generate_header(self):
         """Generate Code Header
+
+        Adds all header code to the generated code buffer.
         """
         code = [
             '#include <stdio.h>',
@@ -118,6 +123,7 @@ class CodeGenerator(object):
             '// define register locations of stack/frame ptr',
             '#define SP       %d' % self._SP,
             '#define FP       %d' % self._FP,
+            '#define HP       %d' % self._HP,
             '',
             'int main(void)',
             '{',
@@ -125,8 +131,12 @@ class CodeGenerator(object):
             'int MM[MM_SIZE];',
             'int R[R_SIZE];',
             '',
+            '// SP and FP start at the top of MM',
             'R[SP] = MM_SIZE - 1;',
             'R[FP] = MM_SIZE - 1;',
+            '',
+            '// HP starts at the bottom of MM',
+            'R[HP] = 0;',
             '',
             '// allocate float registers',
             'float R_FLOAT_1;',
@@ -143,6 +153,8 @@ class CodeGenerator(object):
 
     def generate_footer(self):
         """Generate Code Footer
+
+        Adds all footer code to the generated code buffer.
         """
         code = [
             '',
@@ -158,7 +170,10 @@ class CodeGenerator(object):
             '',
             'getString_1:',
             '    fgets(STR_BUF, BUF_SIZE, stdin);',
-            '    MM[R[FP]+2] = (int)STR_BUF;',
+            '    R[0] = strlen(STR_BUF) + 1;',
+            '    memcpy(&MM[R[HP]], &STR_BUF, R[0]);',
+            '    MM[R[FP]+2] = (int)((char*)&MM[R[HP]]);',
+            '    R[HP] = R[HP] + R[0];',
             '    R[0] = MM[R[FP]];',
             '    goto *(void*)R[0];',
             '',
@@ -209,6 +224,16 @@ class CodeGenerator(object):
 
     def generate(self, code, tabs=-1):
         """Generate Code
+        
+        Adds the given code to the generated code and automatically formats
+        it with the appropriate tabs and ending newline.
+
+        Arguments:
+            code: The code to add to the generated code buffer.
+            tabs: A manual override to determine the number of tabs to place
+                in this line of code. If -1, then the number of tabs used will
+                correspond to the tab location from tab_push() and tab_pop()
+                methods. (Default: -1)
         """
         tabs = tabs if tabs != -1 else self._tab_count
         self._generated_code += ('    ' * tabs) + code + '\n'
@@ -216,21 +241,46 @@ class CodeGenerator(object):
         return
 
     def comment(self, text, is_displayed=False):
+        """Generate Comment
+
+        Adds a comment to the generated code.
+
+        Arguments:
+            text: The text to display in the comment.
+            is_displayed: If True, the comment is written to the generated
+                code. (Default: False)
+        """
         if is_displayed:
             self.generate('// %s' % text)
 
         return
 
     def tab_push(self):
+        """Tab Push
+
+        Pushes the tab (increases the indentiation by 4 spaces) for pretty
+        code output.
+        """
         self._tab_count += 1
         return
 
     def tab_pop(self):
+        """Tab Pop
+
+        Pops the tab (decreases the indentation by 4 spaces) for pretty code
+        output.
+        """
         self._tab_count -= 1 if self._tab_count != 0 else 0
         return
 
     def commit(self):
         """Commit Code Generation
+
+        Writes the generated code to the destination output file for
+        intermediate code if the source is parsed without fatal errors.
+
+        Returns:
+            True if file is successfully written, False otherwise.
         """
         try:
             with open(self._dest_path, 'w+') as f:
@@ -242,26 +292,30 @@ class CodeGenerator(object):
 
         return True
 
-    def rollback(self):
-        """Rollback Code Generation
-        """
-        self._generated_code = ''
-
-        return
-
-    def get_mm(self, id_size, is_global=False, is_param=False):
+    def get_mm(self, id_size, is_param=False):
         """Get Memory Space
+
+        Gets a space in memory appropriately depending on if the variable is
+        a local variable or a parameter to the scope.
+
+        Arguments:
+            id_size: The size of the parameter to allocate (used for arrays).
+            is_param: True if the identifier is a parameter, False if local or
+                global variable. (Default: False)
+
+        Returns:
+            An integer denoting the offset corresponding to a stack landmark
+            depending on the type of variable. For example, local variables
+            and params are offset by the current FP in different directions
+            while global variables are offset by the top of main memory.
+            See the documentation in README for stack details.
         """
         var_loc = 0
 
         # Determine size of the identifier
         mem_needed = int(id_size) if id_size is not None else 1
         
-        if is_global:
-            # Allocate memory in the global heap space
-            var_loc = self._heap_ptr
-            self._heap_ptr += mem_needed
-        elif is_param:
+        if is_param:
             var_loc = self._param_ptr
             self._param_ptr += mem_needed
         else:
@@ -273,18 +327,36 @@ class CodeGenerator(object):
 
     def reset_local_ptr(self):
         """Reset Local Pointer
+
+        Resets the pointer to the current scope's local variable portion of
+        the stack. This is used to peroperly allocate space for the local
+        variables at the start of the scope.
         """
         self._local_ptr = 1
         return
 
     def reset_param_ptr(self):
         """Reset Param Pointer
+
+        Resets the pointer to the current scope's parameter portion of the
+        stack. This is necessary to properly allocate space for the parameters
+        as they are being pushed onto the stack.
         """
         self._param_ptr = 2
         return
 
     def get_reg(self, inc=True):
         """Get Register
+
+        Gets new, unused register from the register list.
+
+        Arguments:
+            inc: If True, a new register will be returned. If False, the last
+                register allocated will be returned.
+
+        Returns:
+            An integer denoting the register number. The register may then be
+            referenced as follows: R[<reg_num>]
         """
         # Increment the register if we're getting a brand new one
         self._reg += 1 if inc else 0
@@ -293,6 +365,12 @@ class CodeGenerator(object):
 
     def get_label_id(self):
         """Get Label Id
+
+        Gets a label id so that no conflicts occur between procedures with
+        the same name in difference scopes.
+
+        Returns:
+            A label id to append to the procedure label.
         """
         self._label_id += 1
 
@@ -300,10 +378,35 @@ class CodeGenerator(object):
 
     def get_unique_call_id(self):
         """Get Unique Call Id
+
+        Gets a unique call id so that no conflicts occur between return
+        labels for procedures with multiple calls.
+
+        Returns:
+            A unique id to append to the procedure return label.
         """
         self._unique_id += 1
 
         return self._unique_id
+
+    def generate_return(self, debug):
+        """Generate Return Statement
+
+        Generates code for all operations needed to move to the scope return
+        address and execute the jump to the caller scope.
+
+        Arguments:
+            debug: Determines if comments should be displayed or not.
+        """
+        # Smash the local stack
+        self.comment('Moving SP to FP (return address)', debug)
+        self.generate('R[SP] = R[FP];')
+
+        # Goto the return label to exit the procedure
+        self.comment('Return to calling functon', debug)
+        self.generate('goto *(void*)MM[R[FP]];')
+
+        return
 
     def do_operation(self, reg1, type1, reg2, type2, operation):
         """Do Operation
