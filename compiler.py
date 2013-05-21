@@ -9,7 +9,8 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Functions:
-    main: The main call to begin input file compilation given valid arguments.
+    parse_arguments: Parses incoming command line arguments with argparse.
+    compile: Executes the complete compilation process.
 """
 
 # Import standard libraries
