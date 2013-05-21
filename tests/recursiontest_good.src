@@ -1,0 +1,30 @@
+program recursiontest is
+
+    integer start_val;
+    global integer end_val;
+
+    procedure count_to_ten(integer current_val in)
+    begin
+        putInteger(current_val);
+
+        if (current_val < 10) then
+            count_to_ten(current_val + 1);
+        else
+            end_val := current_val;
+        end if;
+    end procedure;
+
+begin
+
+    start_val := 1;
+    end_val := 0;
+
+    count_to_ten(start_val);
+
+    if (end_val == 10) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
+
+end program

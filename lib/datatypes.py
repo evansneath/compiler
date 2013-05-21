@@ -69,7 +69,12 @@ class IdentifierTable(list):
         pop_scope: Removes the highest scope.
         add: Adds a new identifier to the current or global scope.
         find: Determines if an identifier is in the current of global scope.
+        get_id_location: Determines where the identifer exists in the scope.
         is_global: Determines if an identifier exists in the global scope.
+        is_param: Determines if an identifier is a parameter of the scope.
+        get_param_direction: Gets the direction of the parameter in the scope.
+        get_current_scope_owner: Gets the program or procedure name from which
+            the current scope was created.
     """
     def __init__(self):
         super(IdentifierTable, self).__init__()
@@ -168,6 +173,26 @@ class IdentifierTable(list):
             raise ParserNameError()
 
         return identifier
+
+    def get_id_location(self, name):
+        """Get Identifier Location
+
+        Determines the location of the identifier in the stack based on the
+        identifier's place in the id table.
+
+        Arguments:
+            name: The identifier name for which to search.
+
+        Returns:
+            A string value for the location of the identifier in the stack.
+            This may be 'global', 'param', or 'local'.
+        """
+        if self.is_global(name):
+            return 'global'
+        elif self.is_param(name):
+            return 'param'
+
+        return 'local'
 
     def is_global(self, name):
         """Identifier is Global

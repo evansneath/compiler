@@ -19,9 +19,12 @@ class CodeGenerator(object):
     file upon successful compilation. This class is designed to be subclassed
     the be used during the parsing stage of the compiler.
 
+    Attributes:
+        runtime_functions: Details of each runtime function and its params.
+
     Methods:
         attach_destination: Binds a destination file to the code generator.
-        generate_header: Generates start overhead code (memory allocation, etc).
+        generate_header: Generates overhead code (memory allocation, etc).
         generate_footer: Generates finishing overhead code.
         generate: Formats and stores a given string of code for later output.
         comment: Adds a comment to the generated code with appropriate tabbing.
@@ -29,11 +32,24 @@ class CodeGenerator(object):
         tab_pop: Decreases the tab depth by 1 tab (4 spaces).
         commit: Commits all code generation and writesto the destination file.
         get_mm: Provides a free memory space for global or local variables.
+        reset_local_ptr: Resets the value for the local pointer to default.
+        reset_param_ptr: Resets the value for the param pointer to default.
         get_reg: Provides a free register for intermediate variable use.
         get_label_id: Returns a unique identifier for the procedure call.
         get_unique_call_id: Returns a unique identifier for multiple calls.
+        generate_procedure_call: Generates all code associated with managing
+            the memory stack during a procedure call.
+        generate_procedure_call_end: Generates code to clean up a procedure
+            call. This finalizes the call by popping the SP to local stack.
+        generate_name: Generates all code associated with name reference.
+        generate_assignment: Generates all code associated with id assignment.
+        generate_param_push: Generates code to push a param onto the stack.
+        generate_param_pop: Generates code to pop a param off the stack.
+        generate_param_store: Generates code to save an outgoing parameter
+            to an identifier located in main memory.
+        generate_number: Generates the code for a number reference.
         generate_return: Generates the code for the 'return' operation.
-        do_operation: Generates operation code given an operation.
+        generate_operation: Generates operation code given an operation.
     """
     def __init__(self):
         super(CodeGenerator, self).__init__()
@@ -389,6 +405,233 @@ class CodeGenerator(object):
 
         return self._unique_id
 
+    def generate_procedure_call(self, proc_name, proc_num, debug):
+        """Generate Procedure Call
+
+        Generates the code associated with managing the stack before and
+        after a procedure call. Note that this does not include param
+        pushing and popping operations.
+
+        Arguments:
+            proc_name: The name of the procedure to call.
+            proc_num: The label id of the procedure to call.
+            debug: Determines if comments should be written to the code.
+        """
+        # Save the FP to the stack. Set next FP to return address
+        self.comment('Setting caller FP', debug)
+        self.generate('R[SP] = R[SP] - 1;')
+        self.generate('MM[R[SP]] = R[FP];')
+        self.comment('Setting return addr (current FP)', debug)
+        self.generate('R[SP] = R[SP] - 1;')
+        self.generate('R[FP] = R[SP];')
+
+        # Generate a new call number so multiple calls do not cause collisions
+        call_number = self.get_unique_call_id()
+
+        # Push the return addr onto the stack
+        self.generate('MM[R[SP]] = (int)&&%s_%d_%d;' %
+                (proc_name, proc_num, call_number))
+                
+        # Make the jump to the function call
+        self.generate('goto %s_%d;' % (proc_name, proc_num))
+
+        # Generate the return label
+        self.generate('%s_%d_%d:' % (proc_name, proc_num, call_number))
+
+        # The SP now points to the return address. Restore the old FP
+        self.comment('Restore caller FP', debug)
+        self.generate('R[SP] = R[SP] + 1;')
+        self.generate('R[FP] = MM[R[SP]];')
+
+        return
+
+    def generate_procedure_call_end(self, debug):
+        """Generate Procedure Call End
+
+        Generates code to leave the procedure on the stack by pushing the
+        stack to the lower scope's local stack.
+
+        Arguments:
+            debug: Determines if comments are to be written in generated code.
+        """
+        self.comment('Move to caller local stack', self.debug)
+
+        # Finalize the function call. Move the SP off the param list
+        self.generate('R[SP] = R[SP] + 1;')
+
+        return
+
+    def _generate_get_id_in_mm(self, id_obj, id_location, idx_reg, debug):
+        """Genereate Get Identifier in Main Memory (Protected)
+
+        Knowing the location in the stack and the offset (mm_ptr) value of
+        a given index, code is genereated to calculate the exact location of
+        the identifier in main memory.
+
+        If identifier is param, offset is the parameter offset.
+        If identifier is local, offset is the local offset.
+        If identifier is global, offset is the local offset of program scope.
+
+        Arguments:
+            id_obj: The Identifier class object containing id data.
+            id_location: Either 'global', 'param', or 'local' depending on the
+                location in the stack where the identifier resides.
+            idx_reg: The register number of the index expression.
+            debug: Determines if comments are to be written in generated code.
+
+        Returns:
+            The register number of the calculated address of the identifier.
+        """
+        # Get a new register to calculate the main memory addr of this id
+        id_reg = self.get_reg()
+
+        self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
+
+        if id_obj.size is not None and idx_reg is not None:
+            self.generate('R[%d] = R[%d] + R[%d];' %
+                    (id_reg, id_reg, idx_reg))
+
+        if id_location == 'param':
+            self.comment('Param referenced', debug)
+            self.generate('R[%d] = R[FP] + 1 + R[%d];' % (id_reg, id_reg))
+        elif id_location == 'global':
+            self.comment('Global var referenced', debug)
+            self.generate('R[%d] = MM_SIZE - 1 - R[%d];' % (id_reg, id_reg))
+        else:
+            self.comment('Local var referenced', debug)
+            self.generate('R[%d] = R[FP] - R[%d];' % (id_reg, id_reg))
+
+        return id_reg
+
+    def generate_name(self, id_obj, id_location, idx_reg, debug):
+        """Genereate Name
+
+        Genereates all code necessary to place the contents of the memory
+        location of a given identifier into a new register for computation.
+
+        Arguments:
+            id_obj: The Identifier class object containing id data.
+            id_location: Either 'global', 'param', or 'local' depending on the
+                location in the stack where the identifier resides.
+            idx_reg: The register number of the index expression.
+            debug: Determines if comments are to be written in generated code.
+        """
+        # Calculate the position of the identifier in main memory
+        id_reg = self._generate_get_id_in_mm(id_obj, id_location, idx_reg,
+                debug)
+
+        # Retrieve the main memory location and place it in the last register
+        self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
+
+        return
+
+    def generate_assignment(self, id_obj, id_location, idx_reg, expr_reg,
+            debug):
+        """Generate Assignment
+
+        Generates all code necessary to place the outcome of an expression
+        into the proper location of the identifier in main memory.
+
+        Arguments:
+            id_obj: The Identifier class object containing id data.
+            id_location: Either 'global', 'param', or 'local' depending on the
+                location in the stack where the identifier resides.
+            idx_reg: The register number of the index expression.
+            expr_reg: The register number of the expression outcome.
+            debug: Determines if comments are to be written in generated code.
+        """
+        # Calculate the position of the identifier in main memory
+        id_reg = self._generate_get_id_in_mm(id_obj, id_location, idx_reg,
+                debug)
+
+        # Set the main memory value to the value in the expression register
+        self.generate('MM[R[%d]] = R[%d];' % (id_reg, expr_reg))
+
+        return
+
+    def generate_param_push(self, expr_reg, debug):
+        """Generate Param Push
+
+        Generates code to push a parameter onto the procedure stack given
+        a register containing the expression outcome.
+
+        Arguments:
+            expr_reg: The register number of the expression outcome.
+            debug: Determines if comments are to be written in generated code.
+        """
+        self.comment('Pushing argument onto the stack', debug)
+        self.generate('R[SP] = R[SP] - 1;')
+        self.generate('MM[R[SP]] = R[%d];' % expr_reg)
+
+        return
+
+    def generate_param_pop(self, param_name, debug):
+        """Generate Param Pop
+
+        Pops a parameter off of the stack (moves the SP) and prints a
+        comment stating which parameter this is.
+
+        Arguments:
+            param_name: The parameter name to display.
+            debug: Determines if comments are to be written in generated code.
+        """
+        self.comment('Popping "%s" param off the stack' % param_name, debug)
+                
+        # Move to the next memory space
+        self.generate('R[SP] = R[SP] + 1;')
+
+        return
+
+    def generate_param_store(self, id_obj, id_location, debug):
+        """Generate Param Store
+
+        Calculates the memory location of the destination and placed the
+        value of the popped parameter (at current SP) in that location.
+
+        Arguments:
+            id_obj: The Identifier class object containing id data.
+            id_location: Either 'global', 'param', or 'local' depending on the
+                location in the stack where the identifier resides.
+            debug: Determines if comments are to be written in generated code.
+        """
+        # Calculate the position of the parameter output location in main mem
+        id_reg = self._generate_get_id_in_mm(id_obj, id_location, None, debug)
+
+        # Store the parameter in the position pointed to by the SP
+        self.generate('MM[R[%d]] = MM[R[SP]];' % id_reg)
+
+        return
+
+    def generate_number(self, number, type, negate):
+        """Genereate Number
+
+        Generates the code to store a parsed number in a new register.
+
+        Arguments:
+            number: The parsed number value (this is a string representation).
+            type: The type of the number (either 'integer' or 'float')
+            negate: A boolean to determine whether or not to negate the value.
+        """
+        reg = self.get_reg()
+
+        if type == 'integer':
+            # This is an integer value, set it to the register
+            if negate:
+                self.generate('R[%d] = -%s;' % (reg, number))
+            else:
+                self.generate('R[%d] = %s;' % (reg, number))
+        else:
+            # This is a float value, place it in the float buffer and copy it
+            # to the register
+            if negate:
+                self.generate('R_FLOAT_1 = -%s;' % number)
+            else:
+                self.generate('R_FLOAT_1 = %s;' % number)
+
+            self.generate('memcpy(&R[%d], &R_FLOAT_1, sizeof(float));' % reg)
+
+        return
+
     def generate_return(self, debug):
         """Generate Return Statement
 
@@ -408,8 +651,22 @@ class CodeGenerator(object):
 
         return
 
-    def do_operation(self, reg1, type1, reg2, type2, operation):
-        """Do Operation
+    def generate_operation(self, reg1, type1, reg2, type2, operation):
+        """Generate Operation
+
+        Given an operation and operand registers with their types, code is
+        generated to perform these operations.
+
+        Arguments:
+            reg1: The register of the first operand.
+            type1: The type of the first operand.
+            reg2: The register of the second operand.
+            type2: The type of the second operand.
+            operation: The operation symbol to perform.
+
+        Returns:
+            The register number where the result of the operation
+            is stored.
         """
         # Get a register to hold the operation result
         result = self.get_reg()
