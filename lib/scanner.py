@@ -17,7 +17,7 @@ from os.path import isfile
 from lib.datatypes import Token
 
 
-class Scanner(object):
+class Scanner:
     """Scanner class
 
     This class implements a scanner object to scan a source code file in the
@@ -47,7 +47,7 @@ class Scanner(object):
     ]
 
     def __init__(self):
-        super(Scanner, self).__init__()
+        super().__init__()
 
         # Holds the file path of the attached source file
         self._src_path = ''

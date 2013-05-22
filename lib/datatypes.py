@@ -77,7 +77,7 @@ class IdentifierTable(list):
             the current scope was created.
     """
     def __init__(self):
-        super(IdentifierTable, self).__init__()
+        super().__init__()
 
         # Create the global scope
         self.append({})

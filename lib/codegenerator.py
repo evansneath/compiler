@@ -11,7 +11,7 @@ Classes:
     CodeGenerator: A code generator interface for destination file outputting.
 """
 
-class CodeGenerator(object):
+class CodeGenerator:
     """CodeGenerator class
 
     This class implements code generator function calls to easily attach a
@@ -52,7 +52,7 @@ class CodeGenerator(object):
         generate_operation: Generates operation code given an operation.
     """
     def __init__(self):
-        super(CodeGenerator, self).__init__()
+        super().__init__()
 
         # Holds the file path of the attached destination file
         self._dest_path = ''

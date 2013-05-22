@@ -38,7 +38,7 @@ class Parser(Scanner, CodeGenerator):
             the end-of-file token is reached.
     """
     def __init__(self, debug=False):
-        super(Parser, self).__init__()
+        super().__init__()
 
         # Public class attributes
         self.debug = debug
