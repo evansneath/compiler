@@ -84,19 +84,67 @@ objects. The `datatypes.py` and `errors.py` source files containing several
 datatypes and exception classes respectively which are used in the various
 components of the compiler.
 
+###Scanning
+
+The implementation of the language scanner first tackles the problem of source
+code parsing by splitting the source code into a list of distinct lines. Not
+only does this allow for easier ways to determine end of line and end of file,
+but also makes the operation of retrieving line numbers simple for purposes of
+warning and error messages.
+
+At the start of each non-whitespace character, the first character is used to
+determine the type of the token to expect. The token is returned is the type is
+matched without issue. Otherwise, a scanner warning is thrown.
+
+The scanner warnings are never fatal, though syntactically the tokens returned
+may cause a parser error. My methodology behind the scanner was to try to
+correct as many lexical errors as possible. For instance, if a string literal
+has no end quote a warning will be thrown and a quote will be assumed at the
+end of the line.
+
 ###Parsing
 
 In order to eliminate loops caused by recursive grammar, any left-recursion in
 the language grammar was rewritten.
 
+Type-checking is performed in expressions by returning the types from the
+expression tree functions and evaluating types for compatibility if an
+operation is performed. There are many other locations were type-checking is
+performed in the compiler other than expressions.
+
+Parser resync points are used throughout the compiler to continue parsing if
+an error is encountered without propogating spurious error messages. Expection
+handling in Python is used to elegantly handle resyncing. Once a parser error
+is encountered in a statement or declaration, an exception is raised. This
+exception is then handled at the starting point of statement or declaration
+parsing and the parsing will continue to the next statement or declaration.
+
+Note that once a fatal error or any kind is encountered, code will no longer
+be generated.
+
 ###Code Generation
 
-The memory structure of the program is divided into the stack and heap. The
-stack begins are the high memory address and is maintained using both a stack
-and frame pointer. The frame pointer (pointing to the scope's return address)
-provides a way to easily smash local stack variables when leaving the scope.
-All global variables must be declared in the program scope and are referenced
-using the offset from the top of main memory.
+Memory and registers for the operation of the program are defined and used as
+32-bit integer arrays. This allows for simple addressing of memory and register
+space. All non-integer types present in the program are cast as integers for
+storage in the memory spaces. In the case of string storage, memory spaces hold
+a 32-bit pointer to the start of the string in either the heap (this will be
+covered later) or a literal value. To ensure that pointers are 32-bit and may
+be cast to integer without issue, the `gcc` compiler flag `-m32` is used.
+
+A fixed number of available register locations are allocated for use. These are
+used incrementally and are not reused or reallocated. For this reason, a large
+number of registers are required so that register space is always available.
+Future improvements could be made to "push back" register allocation to the
+first register (`R[0]`) at the end of each scope. At the end of a scope, it can
+be assumed that the same register will not be referenced again.
+
+The main memory structure of the program is divided into the stack and heap.
+The stack begins are the high memory address and is maintained using both a
+stack and frame pointer. The frame pointer (pointing to the scope's return
+address) provides a way to easily smash local stack variables when leaving the
+scope. All global variables may only be declared in the program scope and are
+referenced using the offset from the top of main memory.
 
 The heap in main memory is used only to allocate space for strings during
 runtime. This is accomplished using a heap pointer pointing to the next unused
@@ -105,7 +153,7 @@ string retrieved from `stdin` is moved to the heap and the variable
 referencing that string is modified to point to the newly allocated heap
 location.
 
-Memory is arranged in the following fashion.
+Memory is arranged in the following manner:
 
 ```
          MAIN MEMORY
@@ -139,8 +187,8 @@ E   | ----------------- |
     |         .         |
     |         .         |
     |         .         |
-    | HEAP              |
-    `-------------------` <== MM_START (0)
+    | HEAP              | <== MM_START (0)
+    `-------------------`
 ```
 
 When entering a scope, the caller pushes all params onto the stack in reverse
@@ -158,6 +206,23 @@ ensures that the program code remains in the `main` function and no outside
 function calls are required. The technique of using
 [labels as values](http://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html)
 was used to store the location of the return labels on the stack.
+
+Loop and conditional statements also make use of the `goto` statement to
+determine program flow. After the conditional expression is resolved to a
+boolean form, the register used for the expression is tested. If the expression
+resolved to `false`, then the code portion is skipped.
+
+For example:
+
+```
+R[0] = <expression_outcome>;
+if (!R[0]) goto else_label;
+    <do if>
+    goto end_if_label;
+else_label:
+    <do_else>
+end_if_label:
+```
 
 ###Runtime Environment
 Initially, I had created a separate C library to implement the runtime
