@@ -93,7 +93,7 @@ but also makes the operation of retrieving line numbers simple for purposes of
 warning and error messages.
 
 At the start of each non-whitespace character, the first character is used to
-determine the type of the token to expect. The token is returned is the type is
+determine the type of the token to expect. The token is returned if the type is
 matched without issue. Otherwise, a scanner warning is thrown.
 
 The scanner warnings are never fatal, though syntactically the tokens returned
@@ -217,7 +217,7 @@ For example:
 ```
 R[0] = <expression_outcome>;
 if (!R[0]) goto else_label;
-    <do if>
+    <do_if>
     goto end_if_label;
 else_label:
     <do_else>
