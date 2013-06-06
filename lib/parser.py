@@ -98,10 +98,12 @@ class Parser(Scanner, CodeGenerator):
         if not self._check('eof'):
             self._warning('eof', '')
 
+        # No errors were encountered. Write the code and exit successfully
         if not self._has_errors:
             self.commit()
+            return True
 
-        return True
+        return False
 
     def _add_runtime(self):
         """Add Runtime Functions

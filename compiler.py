@@ -15,7 +15,8 @@ Functions:
 
 # Import standard libraries
 import argparse
-from subprocess import call
+import subprocess
+import sys
 
 # Import custom compiler libraries
 from lib.parser import Parser
@@ -73,7 +74,7 @@ def run_compiler(source, target, debug=False):
     gcc_cmd = ['gcc', '-m32', '-o', target, TMP_CODE_FILE]
 
     # Compile the temporary file with gcc. Output to the target location
-    if call(gcc_cmd) != 0:
+    if subprocess.call(gcc_cmd) != 0:
         print('Error while compiling "%s"' % target)
         return False
 
@@ -85,7 +86,7 @@ if __name__ == '__main__':
     args = parse_arguments()
 
     # Run compilation process
-    run_compiler(args.source, args.out, debug=args.debug)
+    result = run_compiler(args.source, args.out, debug=args.debug)
 
     # Terminate program
-    exit()
+    sys.exit(not result)
