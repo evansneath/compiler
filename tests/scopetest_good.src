@@ -16,7 +16,12 @@ begin
     add2 := 5; 
 
     add(add1, add2, sum);
-    putInteger(sum);
+
+    if (sum == 6) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
 
     return;
 

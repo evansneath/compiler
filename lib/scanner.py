@@ -21,7 +21,7 @@ class Scanner:
     """Scanner class
 
     This class implements a scanner object to scan a source code file in the
-    compilation process. This class is designed to be subclassed to be used
+    compilation process. This class is designed to be inherited to be used
     during the parsing stage of the compiler.
 
     Attributes:
@@ -74,7 +74,7 @@ class Scanner:
         """
         # Make sure the inputted file is a actual file
         if not isfile(src_path):
-            print('Error: "{0}"'.format(src_path))
+            print('Error: "%s"' % src_path)
             print('    Inputted path is not a file')
             return False
 
@@ -83,7 +83,7 @@ class Scanner:
             with open(src_path) as f:
                 self._src = f.read().splitlines(keepends=True)
         except IOError:
-            print('Error: "{0}"'.format(src_path))
+            print('Error: "%s"' % src_path)
             print('    Could not read inputted file')
             return False
 
@@ -101,10 +101,7 @@ class Scanner:
         Returns:
             The next token object in the source code.
         """
-        # Store the token type as it is discovered
-        token_type = ''
-
-        # Get the first character, narrow down the data type possiblilites
+        # Get the first character, narrow down the data type possibilities
         char = self._next_word()
 
         if char is None:
@@ -121,7 +118,7 @@ class Scanner:
             value, token_type = self._expect_symbol(char)
         else:
             # We've run across a character that shouldn't be here
-            msg = 'Invalid character \'{0}\' encountered'.format(char)
+            msg = 'Invalid character \'%s\' encountered' % char
             self._scan_warning(msg, hl=self._char_pos-1)
 
             # Run this function again until we find something good
@@ -149,7 +146,7 @@ class Scanner:
         Returns:
             The requested line number from the source, None on invalid line.
         """
-        if line_number > 0 and line_number <= len(self._src):
+        if 0 < line_number <= len(self._src):
             return self._src[line_number-1].strip()
 
     def _scan_warning(self, msg, hl=-1):
@@ -169,8 +166,8 @@ class Scanner:
         print('    ', msg, '\n    ', line.strip(), sep='')
 
         if hl != -1:
-            lspaces = line.find(line.strip()[0])
-            print('    {0}^'.format(' '*(abs(hl)-lspaces)))
+            left_spaces = line.find(line.strip()[0])
+            print('    %s^' % (' '*(abs(hl)-left_spaces)))
 
         return
 
@@ -255,7 +252,6 @@ class Scanner:
             (value, token_type) - A tuple describing the final parsed token.
             The resulting token type will be 'string'.
         """
-        value = ''
         hanging_quote = False
 
         # We know this is a string. Find the next quotation and return it
@@ -273,7 +269,7 @@ class Scanner:
         for i, char in enumerate(value):
             if not char.isalnum() and char not in ' _,;:.\'':
                 value = value.replace(char, ' ', 1)
-                msg = 'Invalid character \'{0}\' in string'.format(char)
+                msg = 'Invalid character \'%s\' in string' % char
                 self._scan_warning(msg, hl=self._char_pos+i)
 
         self._char_pos += len(value)
@@ -376,9 +372,9 @@ class Scanner:
 
             if char is None:
                 break
-            elif value + char == '//':
+            elif value + str(char) == '//':
                 return None, 'comment'
-            elif value + char not in self.symbols:
+            elif value + str(char) not in self.symbols:
                 break
 
             value += char

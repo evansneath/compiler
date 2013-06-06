@@ -20,7 +20,6 @@ begin
 
     calls_increment_global();
 
-    putString("Expect 10");
     if (result == 10) then
         putString("SUCCESS");
     else

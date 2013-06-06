@@ -9,7 +9,7 @@ Author: Evan Sneath
 License: Open Software License v3.0
 
 Functions:
-    parse_arguments: Parses incoming command line arguments with argparse.
+    parse_arguments: Parses incoming command line arguments.
     compile: Executes the complete compilation process.
 """
 
@@ -31,17 +31,22 @@ def parse_arguments():
     """
     # Parse the command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--debug', help='print comments in generated code',
-            action='store_true')
-    parser.add_argument('source', help='source file to compile')
-    parser.add_argument('-o', '--out', help='target path for the compiled code',
-            action='store', default='a.out')
+    parser.add_argument('-d', '--debug',
+                        help='print comments in generated code',
+                        action='store_true')
+    parser.add_argument('source',
+                        help='source file to compile')
+    parser.add_argument('-o', '--out',
+                        help='target path for the compiled code',
+                        action='store',
+                        default='a.out')
     args = parser.parse_args()
 
     return args
 
-def compile(source, target, debug=False):
-    """Compile
+
+def run_compiler(source, target, debug=False):
+    """Run Compiler
 
     Executes the compilation process given a source file path.
 
@@ -61,7 +66,7 @@ def compile(source, target, debug=False):
 
     # Parse the source file to the temporary code file
     if not parser.parse(source, TMP_CODE_FILE):
-        print('Error while parsing "'+source+'"')
+        print('Error while parsing "%s"' % source)
         return False
 
     # Set up gcc compilation command
@@ -69,17 +74,18 @@ def compile(source, target, debug=False):
 
     # Compile the temporary file with gcc. Output to the target location
     if call(gcc_cmd) != 0:
-        print('Error while compiling "'+target+'"')
+        print('Error while compiling "%s"' % target)
         return False
 
     return True
+
 
 if __name__ == '__main__':
     # Parse compiler arguments
     args = parse_arguments()
 
     # Run compilation process
-    compile(args.source, args.out, debug=args.debug)
+    run_compiler(args.source, args.out, debug=args.debug)
 
     # Terminate program
     exit()

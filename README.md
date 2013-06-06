@@ -69,7 +69,7 @@ compiler errors and trapping at resync points to continue syntax parsing.
 ###Structure
 
 For the sake of modularity and ease of debugging, the program is structured in
-a heirarchical fashion.
+a hierarchical fashion.
 
 `compiler.py` acts as the engine responsible for parsing of
 command-line arguments, calling the code parser, and completing the build using
@@ -81,7 +81,7 @@ compiling the valid input file. In order to do this, `Parser` inherits the
 `Scanner` class (in `scanner.py`) and the `CodeGenerator` class
 (in `codegenerator.py`) to allow for simple access to their class methods and
 objects. The `datatypes.py` and `errors.py` source files containing several
-datatypes and exception classes respectively which are used in the various
+data types and exception classes respectively which are used in the various
 components of the compiler.
 
 ###Scanning
@@ -113,7 +113,7 @@ operation is performed. There are many other locations were type-checking is
 performed in the compiler other than expressions.
 
 Parser resync points are used throughout the compiler to continue parsing if
-an error is encountered without propogating spurious error messages. Expection
+an error is encountered without propagating spurious error messages. Exception
 handling in Python is used to elegantly handle resyncing. Once a parser error
 is encountered in a statement or declaration, an exception is raised. This
 exception is then handled at the starting point of statement or declaration
@@ -362,16 +362,16 @@ manually at the start of parsing.
    Functions currently being defined are visible in the statement set of the
    function itself (so that recursive calls are possible).
 * No forward references are permitted or supported.
-* Expressions are strongly typed and types must match. Howerever, there is
+* Expressions are strongly typed and types must match. However, there is
    automatic conversion in the arithmetic operators to allow any mixing between
    integers and floats. Furthermore, the relational operators can compare
-   booleans with integers (booleans are converted to integers as `false = 0`,
-   `true = 1`).
+   boolean with integer tokens (boolean tokens are converted to integers as
+    `false = 0`, `true = 1`).
 * The type signatures of a procedure's arguments must match exactly their
    parameter declaration.
 * Arithmetic operations (`+`, `-`, `*`, `/` `&` `|`) are defined for integers
    and floats only. The bitwise AND (`&`), bitwise OR (`|`) and bitwise NOT
    (`not`) operators are valid only on variables of type integer.
-* Relational operations are defined for integers and booleans. Only comparisons
-   between the compatible types is possible. Relational operations return a
-   boolean result.
+* Relational operations are defined for integer and boolean tokens. Only
+   comparisons between the compatible types is possible. Relational operations
+   return a boolean result.

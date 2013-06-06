@@ -75,15 +75,15 @@ class Parser(Scanner, CodeGenerator):
         if not self.attach_destination(dest_path):
             return False
 
-        # Generate the compiled code header to handle runtime overhead
-        self.generate_header()
-
         # Advance the tokens twice to populate both current and future tokens
         self._advance_token()
         self._advance_token()
 
         # Add all runtime functions
         self._add_runtime()
+
+        # Generate the compiled code header to handle runtime overhead
+        self.generate_header()
 
         # Begin parsing the root <program> language structure
         try:
@@ -96,7 +96,7 @@ class Parser(Scanner, CodeGenerator):
 
         # Make sure there's no junk after the end of program
         if not self._check('eof'):
-            self._warning('eof')
+            self._warning('eof', '')
 
         if not self._has_errors:
             self.commit()
@@ -109,20 +109,20 @@ class Parser(Scanner, CodeGenerator):
         Adds each runtime function to the list of global functions.
         """
         # The runtime_functions list is defined in the CodeGenerator class
-        for func_name in iter(self.runtime_functions):
+        for func_name in self.runtime_functions:
             # Get all parameters for these functions
             param_ids = []
             param_list = self.runtime_functions[func_name]
             for index, param in enumerate(param_list):
                 # Build up each param, add it to the list
                 id_obj = Identifier(name=param[0], type=param[1], size=None,
-                        params=None, mm_ptr=(index+1))
+                                    params=None, mm_ptr=(index+1))
                 p_obj = Parameter(id=id_obj, direction=param[2])
                 param_ids.append(p_obj)
 
             # Build the function's identifier
             func_id = Identifier(name=func_name, type='procedure', size=None, 
-                    params=param_ids, mm_ptr=1)
+                                 params=param_ids, mm_ptr=1)
 
             # Add the function to the global scope of the identifier table
             self._ids.add(func_id, is_global=True)
@@ -141,9 +141,9 @@ class Parser(Scanner, CodeGenerator):
             prefix: A string value to be printed at the start of the warning.
                 Overwritten for error messages. (Default: 'Warning')
         """
-        print('{0}: "{1}", line {2}'.format(prefix, self._src_path, line))
-        print('    {0}'.format(msg))
-        print('    {0}'.format(self._get_line(line)))
+        print('%s: "%s", line %d' % (prefix, self._src_path, line))
+        print('    %s' % msg)
+        print('    %s' % self._get_line(line))
 
         return
 
@@ -164,8 +164,8 @@ class Parser(Scanner, CodeGenerator):
         token = self._current
 
         # Print the error message
-        msg = 'Expected {0}, encountered "{1}" ({2})'.format(
-                expected, token.value, token.type)
+        msg = ('Expected %s, encountered "%s" (%s)' %
+               (expected, token.value, token.type))
         self._warning(msg, token.line, prefix='Error')
 
         self._has_errors = True
@@ -179,10 +179,10 @@ class Parser(Scanner, CodeGenerator):
 
         Arguments:
             msg: The reason for the error.
-            name: The name of the identifier where the name error occured.
-            line: The line where the name error occured.
+            name: The name of the identifier where the name error occurred.
+            line: The line where the name error occurred.
         """
-        msg = '{0}: {1}'.format(name, msg)
+        msg = '%s: %s' % (name, msg)
         self._warning(msg, line, prefix='Error')
 
         self._has_errors = True
@@ -199,7 +199,7 @@ class Parser(Scanner, CodeGenerator):
             encountered: A string containing the type encountered.
             line: The line on which the type error occurred.
         """
-        msg = 'Expected {0} type, encountered {1}'.format(expected, encountered)
+        msg = 'Expected %s type, encountered %s' % (expected, encountered)
         self._warning(msg, line, prefix='Error')
 
         self._has_errors = True
@@ -212,7 +212,7 @@ class Parser(Scanner, CodeGenerator):
 
         Arguments:
             msg: The reason for the error.
-            line: The line where the runtime error occured.
+            line: The line where the runtime error occurred.
         """
         self._warning(msg, line, prefix='Error')
 
@@ -233,83 +233,81 @@ class Parser(Scanner, CodeGenerator):
 
         return
 
-    def _check(self, type, value=None, future=False):
+    def _check(self, expected_type, expected_value=None, check_future=False):
         """Check Token (Protected)
 
         Peeks at the token to see if the current token matches the given
         type and value. If it doesn't, don't make a big deal about it.
 
         Arguments:
-            type: The expected type of the token.
-            value: The expected value of the token. (Default: None)
-            future: If True, the future token is checked (Default: False)
+            expected_type: The expected type of the token.
+            expected_value: The expected value of the token. (Default: None)
+            check_future: If True, the future token is checked (Default: False)
 
         Returns:
             True if the token matches the expected value, False otherwise.
         """
         token = self._current
 
-        if future:
+        if check_future:
             token = self._future
 
-        return token.type == type and (token.value == value or value is None)
+        return (token.type == expected_type and
+               (token.value == expected_value or expected_value is None))
 
-    def _accept(self, type, value=None):
+    def _accept(self, expected_type, expected_value=None):
         """Accept Token (Protected)
 
         Compares the token to an expected type and value. If it matches, then
         consume the token. If not, don't make a big deal about it.
 
         Arguments:
-            type: The expected type of the token.
-            value: The expected value of the token. (Default: None)
+            expected_type: The expected type of the token.
+            expected_value: The expected value of the token. (Default: None)
 
         Returns:
             True if the token matches the expected value, False otherwise.
         """
-        if self._check(type, value):
-            #if self.debug:
-            #    print('>>> Consuming:', self._current)
-
+        if self._check(expected_type, expected_value):
             self._advance_token()
             return True
 
         return False
 
-    def _match(self, type, value=None):
+    def _match(self, expected_type, expected_value=None):
         """Match Token (Protected)
 
         Compares the token to an expected type and value. If it matches, then
         consume the token. If not, then throw an error and panic.
 
         Arguments:
-            type: The expected type of the token.
-            value: The expected value of the token. (Default: None)
+            expected_type: The expected type of the token.
+            expected_value: The expected value of the token. (Default: None)
 
         Returns:
             The matched Token class object if successful.
         """
-        # Check the type, if we specified debug, print everything matchd
-        if self._accept(type, value):
+        # Check the id_type, if we specified debug, print everything matched
+        if self._accept(expected_type, expected_value):
             return self._previous
 
         # Something different than expected was encountered
-        if value is not None:
-            self._syntax_error('"'+value+'" ('+type+')')
+        if expected_value is not None:
+            self._syntax_error('"'+expected_value+'" ('+expected_type+')')
         else:
-            self._syntax_error(type)
+            self._syntax_error(expected_type)
 
-    def _resync_at_token(self, type, value=None):
+    def _resync_at_token(self, token_type, token_value=None):
         """Resync at Token
 
         Finds the next token of the given type and value and moves the
         current token to that point. Code parsing can continue from there.
 
         Arguments:
-            type: The type of the token to resync.
-            value: The value of the token to resync. (Default: None)
+            token_type: The id_type of the token to resync.
+            token_value: The value of the token to resync. (Default: None)
         """
-        while not self._check(type, value):
+        while not self._check(token_type, token_value):
             self._advance_token()
 
         return
@@ -322,8 +320,8 @@ class Parser(Scanner, CodeGenerator):
             <program> ::=
                 <program_header> <program_body>
         """
-        id = self._parse_program_header()
-        self._parse_program_body(id)
+        id_obj = self._parse_program_header()
+        self._parse_program_body(id_obj)
 
         return
 
@@ -348,36 +346,23 @@ class Parser(Scanner, CodeGenerator):
         label_id = self.get_label_id()
 
         # Add the new identifier to the global table
-        id = Identifier(id_name, 'program', None, None, label_id)
-        self._ids.add(id, is_global=True)
+        id_obj = Identifier(id_name, 'program', None, None, label_id)
+        self._ids.add(id_obj, is_global=True)
 
         self._match('keyword', 'is')
 
-        # Push the return addr onto the stack
-        self.comment('Setting program return address', self.debug)
-        self.generate('MM[R[FP]] = (int)&&%s_%d_end;' % (id.name, id.mm_ptr))
+        # Generate the program entry point code
+        self.generate_program_entry(id_obj.name, id_obj.mm_ptr, self.debug)
 
-        # Make the jump to the entry point
-        self.generate('goto %s_%d_begin;' % (id.name, id.mm_ptr))
-
-        # Make the main program return
-        self.generate('')
-        self.comment('Creating the program exit point', self.debug)
-        self.generate('%s_%d_end:' % (id.name, id.mm_ptr))
-        self.tab_push()
-        self.generate('return 0;');
-        self.tab_pop()
-        self.generate('')
-                
         # Push the scope to the program body level
-        self._ids.push_scope(id.name)
+        self._ids.push_scope(id_obj.name)
 
         # Add the program to the base scope so it can be resolved as owner
-        self._ids.add(id)
+        self._ids.add(id_obj)
 
-        return id
+        return id_obj
 
-    def _parse_program_body(self, id):
+    def _parse_program_body(self, program_id):
         """<program_body> (Protected)
 
         Parses the <program_body> language structure.
@@ -389,7 +374,7 @@ class Parser(Scanner, CodeGenerator):
                 'end' 'program'
 
         Arguments:
-            id: The identifier object for the program.
+            program_id: The identifier object for the program.
         """
         local_var_size = 0
 
@@ -405,7 +390,7 @@ class Parser(Scanner, CodeGenerator):
             self._match('symbol', ';')
 
         # Label the entry point for the program
-        self.generate('%s_%d_begin:' % (id.name, id.mm_ptr))
+        self.generate('%s_%d_begin:' % (program_id.name, program_id.mm_ptr))
         self.tab_push()
 
         if local_var_size != 0:
@@ -442,7 +427,7 @@ class Parser(Scanner, CodeGenerator):
         """
         is_global = False
 
-        id = None
+        id_obj = None
         size = None
 
         if self._accept('keyword', 'global'):
@@ -451,12 +436,12 @@ class Parser(Scanner, CodeGenerator):
         if self._first_procedure_declaration():
             self._parse_procedure_declaration(is_global=is_global)
         elif self._first_variable_declaration():
-            id = self._parse_variable_declaration(is_global=is_global)
+            id_obj = self._parse_variable_declaration(is_global=is_global)
         else:
             self._syntax_error('procedure or variable declaration')
 
-        if id is not None:
-            size = id.size if id.size is not None else 1
+        if id_obj is not None:
+            size = id_obj.size if id_obj.size is not None else 1
 
         return size
 
@@ -519,16 +504,16 @@ class Parser(Scanner, CodeGenerator):
         mm_ptr = self.get_mm(var_size, is_param=is_param)
 
         # The declaration was valid, add the identifier to the table
-        id = Identifier(var_token.value, id_type, var_size, None, mm_ptr)
+        id_obj = Identifier(var_token.value, id_type, var_size, None, mm_ptr)
 
         if not is_param:
             try:
-                self._ids.add(id, is_global=is_global)
+                self._ids.add(id_obj, is_global=is_global)
             except ParserNameError as e:
                 self._name_error(str(e),
-                        var_token.value, var_token.line)
+                                 var_token.value, var_token.line)
 
-        return id
+        return id_obj
 
     def _parse_type_mark(self):
         """<type_mark> (Protected)
@@ -544,20 +529,20 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             Type (as string) of the variable being declared.
         """
-        type = None
+        id_type = None
 
         if self._accept('keyword', 'integer'):
-            type = 'integer'
+            id_type = 'integer'
         elif self._accept('keyword', 'float'):
-            type = 'float'
+            id_type = 'float'
         elif self._accept('keyword', 'bool'):
-            type = 'bool'
+            id_type = 'bool'
         elif self._accept('keyword', 'string'):
-            type = 'string'
+            id_type = 'string'
         else:
             self._syntax_error('variable type')
 
-        return type
+        return id_type
 
     def _first_procedure_declaration(self):
         """first(<procedure_declarations>) (Protected)
@@ -583,8 +568,8 @@ class Parser(Scanner, CodeGenerator):
         Arguments:
             is_global: Denotes if the procedure is to be globally scoped.
         """
-        id = self._parse_procedure_header(is_global=is_global)
-        self._parse_procedure_body(id)
+        id_obj = self._parse_procedure_header(is_global=is_global)
+        self._parse_procedure_body(id_obj)
 
         return
 
@@ -618,16 +603,16 @@ class Parser(Scanner, CodeGenerator):
         # in place of the mm_ptr attribute since it will not be used
         label_id = self.get_label_id()
 
-        id = Identifier(id_name, 'procedure', None, params, label_id)
+        id_obj = Identifier(id_name, 'procedure', None, params, label_id)
 
         try:
             # Add the procedure identifier to the parent and its own table
-            self._ids.add(id, is_global=is_global)
-            self._ids.push_scope(id.name)
-            self._ids.add(id)
-        except ParserNameError as e:
+            self._ids.add(id_obj, is_global=is_global)
+            self._ids.push_scope(id_obj.name)
+            self._ids.add(id_obj)
+        except ParserNameError:
             self._name_error('name already declared at this scope', id_name,
-                    id_line)
+                             id_line)
 
         # Attempt to add each encountered param at the procedure scope
         for param in params:
@@ -635,19 +620,19 @@ class Parser(Scanner, CodeGenerator):
                 self._ids.add(param.id, is_global=False)
             except ParserNameError:
                 self._name_error('name already declared at global scope',
-                        param.id.name, id_line)
+                                 param.id.name, id_line)
 
         # Define the entry point for the function w/ unique identifier
-        self.generate('%s_%d:' % (id.name, id.mm_ptr))
+        self.generate('%s_%d:' % (id_obj.name, id_obj.mm_ptr))
         self.tab_push()
 
-        # Define the begining of the function body
-        self.generate('goto %s_%d_begin;' % (id.name, id.mm_ptr))
+        # Define the beginning of the function body
+        self.generate('goto %s_%d_begin;' % (id_obj.name, id_obj.mm_ptr))
         self.generate('')
 
-        return id
+        return id_obj
 
-    def _parse_procedure_body(self, id):
+    def _parse_procedure_body(self, procedure_id):
         """<procedure_body> (Protected)
 
         Parses the <procedure_body> language structure.
@@ -659,7 +644,7 @@ class Parser(Scanner, CodeGenerator):
                 'end' 'procedure'
 
         Arguments:
-            id: The identifier object for the procedure.
+            procedure_id: The identifier object for the procedure.
         """
         local_var_size = 0
 
@@ -681,7 +666,9 @@ class Parser(Scanner, CodeGenerator):
             self._match('symbol', ';')
 
         # Define the function begin point
-        self.generate('%s_%d_begin:' % (id.name, id.mm_ptr))
+        self.generate('%s_%d_begin:' %
+                      (procedure_id.name, procedure_id.mm_ptr))
+
         self.tab_push()
 
         if local_var_size != 0:
@@ -709,7 +696,7 @@ class Parser(Scanner, CodeGenerator):
 
         return
 
-    def _parse_parameter_list(self, params=[]):
+    def _parse_parameter_list(self, params):
         """<parameter_list> (Protected)
 
         Parse the <parameter_list> language structure.
@@ -719,11 +706,11 @@ class Parser(Scanner, CodeGenerator):
                 <parameter>
 
         Arguments:
-            params: A list of Parameter namedtuples associated with the
-                procedure. (Default: None)
+            params: A list of Parameter named tuples associated with the
+                procedure.
 
         Returns:
-            An completed list of all Parameter namedtuples associated
+            An completed list of all Parameter named tuples associated
             with the procedure.
         """
         # Get one parameter
@@ -748,7 +735,7 @@ class Parser(Scanner, CodeGenerator):
         # Return the id object, but don't add it to the identifier table
         # yet or get a memory location for it. This will be done when the
         # procedure is called
-        id = self._parse_variable_declaration(is_param=True)
+        id_obj = self._parse_variable_declaration(is_param=True)
 
         direction = None
 
@@ -759,7 +746,7 @@ class Parser(Scanner, CodeGenerator):
         else:
             self._syntax_error('"in" or "out"')
 
-        return Parameter(id, direction)
+        return Parameter(id_obj, direction)
 
     def _parse_statement(self):
         """<statement> (Protected)
@@ -774,7 +761,7 @@ class Parser(Scanner, CodeGenerator):
                 <procedure_call>
         """
         if self._accept('keyword', 'return'):
-            # Goto the return label to exit the procedure/program
+            # Go to the return label to exit the procedure/program
             self.generate_return(self.debug)
         elif self._first_if_statement():
             self._parse_if_statement()
@@ -839,7 +826,7 @@ class Parser(Scanner, CodeGenerator):
             direction = self._ids.get_param_direction(id_name)
             if direction != 'out':
                 self._type_error('\'out\' param',
-                        '\'%s\' param' % direction, id_line)
+                                 '\'%s\' param' % direction, id_line)
                 raise ParserTypeError()
 
         # Generate all code associated with retrieving this value
@@ -992,7 +979,7 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             True if current token matches a first terminal, False otherwise.
         """
-        return self._check('symbol', '(', future=True)
+        return self._check('symbol', '(', check_future=True)
 
     def _parse_procedure_call(self):
         """<procedure_call> (Protected)
@@ -1003,21 +990,16 @@ class Parser(Scanner, CodeGenerator):
                 <identifier> '(' [ <argument_list> ] ')'
         """
         # Match an identifier, check to make sure the identifier is procedure
-        id_obj = None
         id_name = self._current.value
         id_line = self._current.line
-        id_type = None
-
-        out_names = []
-        num_args = 0
 
         self._match('identifier')
 
         try:
             id_obj = self._ids.find(id_name)
         except ParserNameError as e:
-            self._name_error('procedure has not beed declared', id_name,
-                    id_line)
+            self._name_error('procedure has not been declared', id_name,
+                             id_line)
             raise e
 
         if id_obj.type != 'procedure':
@@ -1026,14 +1008,20 @@ class Parser(Scanner, CodeGenerator):
 
         self._match('symbol', '(')
 
+        out_names = []
+
         if not self._check('symbol', ')'):
-            (num_args, out_names) = self._parse_argument_list(id_obj.params,
-                    index=0, out_names=out_names)
+            num_args, out_names = self._parse_argument_list(
+                id_obj.params,
+                out_names,
+                index=0)
 
             # Make sure that too few arguments are not used
             if num_args < len(id_obj.params):
-                self._runtime_error(('procedure call accepts %d argument(s),' +
-                        ' %d given') % (len(id_obj.params), num_args), id_line)
+                self._runtime_error(
+                    'procedure call accepts %d argument(s), %d given' %
+                    (len(id_obj.params), num_args), id_line)
+
                 raise ParserRuntimeError()
 
         self._match('symbol', ')')
@@ -1064,7 +1052,7 @@ class Parser(Scanner, CodeGenerator):
 
         return
 
-    def _parse_argument_list(self, params, index=0, out_names=[]):
+    def _parse_argument_list(self, params, out_names, index=0):
         """<argument_list> (Protected)
 
         Parses <argument_list> language structure.
@@ -1076,10 +1064,10 @@ class Parser(Scanner, CodeGenerator):
         Arguments:
             params: A list of Parameter namedtuple objects allowed in the
                 procedure call.
-            index: The index in params with which to match the found param.
-                (Default: 0)
             out_names: A list of identifier names that are being used in this
                 procedure call and must be written back.
+            index: The index in params with which to match the found param.
+                (Default: 0)
 
         Returns:
             A tuple (index, out_names) consisting of the number of arguments
@@ -1091,7 +1079,7 @@ class Parser(Scanner, CodeGenerator):
         # Make sure that too many arguments are not used
         if index > len(params) - 1:
             self._runtime_error('procedure call accepts only %d argument(s)' %
-                    len(params), arg_line)
+                                len(params), arg_line)
             raise ParserRuntimeError()
 
         # Get the parameter information for this position in the arg list
@@ -1118,14 +1106,16 @@ class Parser(Scanner, CodeGenerator):
         index += 1
 
         if self._accept('symbol', ','):
-            (index, out_names) = self._parse_argument_list(params, index,
-                    out_names)
+            index, out_names = self._parse_argument_list(
+                params,
+                out_names,
+                index=index)
 
         # Push the parameters onto the stack in reverse order. The last param
         # will reach this point first
         self.generate_param_push(expr_reg, self.debug)
 
-        return (index, out_names)
+        return index, out_names
 
     def _parse_destination(self):
         """<destination> (Protected)
@@ -1138,27 +1128,24 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             Type of the destination identifier as a string.
         """
-        id = None
-
         id_name = self._current.value
         id_line = self._current.line
-        id_type = None
 
         self._match('identifier')
 
         # Make sure that identifier is valid for the scope
         try:
-            id = self._ids.find(id_name)
+            id_obj = self._ids.find(id_name)
         except ParserNameError as e:
             self._name_error('not declared in this scope', id_name, id_line)
             raise e
 
         # Check type to make sure it's a variable
-        if not id.type in ['integer', 'float', 'bool', 'string']:
-            self._type_error('variable', id.type, id_line)
+        if not id_obj.type in ['integer', 'float', 'bool', 'string']:
+            self._type_error('variable', id_obj.type, id_line)
             raise ParserTypeError()
 
-        id_type = id.type
+        id_type = id_obj.type
 
         if self._accept('symbol', '['):
             expr_line = self._current.line
@@ -1168,7 +1155,7 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer', expr_type, expr_line)
 
             self._accept('symbol', ']')
-        elif id.size is not None:
+        elif id_obj.size is not None:
             self._runtime_error('%s: array requires index' % id_name, id_line)
 
         return id_type
@@ -1190,23 +1177,19 @@ class Parser(Scanner, CodeGenerator):
 
         negate = False
 
-        # Holds the register number of the expression result
-        result = 0
-
         if self._accept('keyword', 'not'):
             negate = True
 
         line = self._current.line
-        type = self._parse_arith_op()
+        id_type = self._parse_arith_op()
 
-        if negate and type not in ['integer', 'bool']:
-            self._type_error('integer or bool', type, line)
+        if negate and id_type not in ['integer', 'bool']:
+            self._type_error('integer or bool', id_type, line)
             raise ParserTypeError()
 
         while True:
             operand1 = self.get_reg(inc=False)
 
-            operation = ''
             if self._accept('symbol', '&'):
                 operation = '&'
             elif self._accept('symbol', '|'):
@@ -1214,8 +1197,8 @@ class Parser(Scanner, CodeGenerator):
             else:
                 break
 
-            if type not in ['integer', 'bool']:
-                self._type_error('integer or bool', type, line)
+            if id_type not in ['integer', 'bool']:
+                self._type_error('integer or bool', id_type, line)
                 raise ParserTypeError()
 
             next_type = self._parse_arith_op()
@@ -1226,13 +1209,13 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
 
-            result = self.generate_operation(operand1, type, operand2,
-                    next_type, operation)
+            result = self.generate_operation(operand1, id_type, operand2,
+                                             next_type, operation)
 
             if negate:
                 self.generate('R[%d] = ~R[%d];' % (result, result))
 
-        return type
+        return id_type
 
     def _parse_arith_op(self):
         """<arith_op> (Protected)
@@ -1248,12 +1231,11 @@ class Parser(Scanner, CodeGenerator):
             The type value of the expression.
         """
         line = self._current.line
-        type = self._parse_relation()
+        id_type = self._parse_relation()
 
         while True:
             operand1 = self.get_reg(inc=False)
 
-            operation = ''
             if self._accept('symbol', '+'):
                 operation = '+'
             elif self._accept('symbol', '-'):
@@ -1261,8 +1243,8 @@ class Parser(Scanner, CodeGenerator):
             else:
                 break
 
-            if type not in ['integer', 'float']:
-                self._type_error('integer or float', type, line)
+            if id_type not in ['integer', 'float']:
+                self._type_error('integer or float', id_type, line)
                 raise ParserTypeError()
 
             next_type = self._parse_relation()
@@ -1273,10 +1255,10 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
 
-            self.generate_operation(operand1, type, operand2, next_type,
-                    operation)
+            self.generate_operation(operand1, id_type, operand2, next_type,
+                                    operation)
 
-        return type
+        return id_type
 
     def _parse_relation(self):
         """<relation> (Protected)
@@ -1296,14 +1278,13 @@ class Parser(Scanner, CodeGenerator):
             The type value of the expression.
         """
         line = self._current.line
-        type = self._parse_term()
+        id_type = self._parse_term()
 
         # Check for relational operators. Note that relational operators
-        # are only valid for integers or booleans
+        # are only valid for integer or boolean tokens
         while True:
             operand1 = self.get_reg(inc=False)
 
-            operation = ''
             if self._accept('symbol', '<'):
                 operation = '<'
             elif self._accept('symbol', '>'):
@@ -1319,8 +1300,8 @@ class Parser(Scanner, CodeGenerator):
             else:
                 break
 
-            if type not in ['integer', 'bool']:
-                self._type_error('integer or bool', type, line)
+            if id_type not in ['integer', 'bool']:
+                self._type_error('integer or bool', id_type, line)
                 raise ParserTypeError()
 
             next_type = self._parse_term()
@@ -1331,10 +1312,10 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or bool', next_type, line)
                 raise ParserTypeError()
 
-            self.generate_operation(operand1, type, operand2, next_type,
-                    operation)
+            self.generate_operation(operand1, id_type, operand2, next_type,
+                                    operation)
 
-        return type
+        return id_type
 
     def _parse_term(self):
         """<term> (Protected)
@@ -1350,14 +1331,13 @@ class Parser(Scanner, CodeGenerator):
             The type value of the expression.
         """
         line = self._current.line
-        type = self._parse_factor()
+        id_type = self._parse_factor()
 
         # Check for multiplication or division operators. Note that these
         # operators are only valid for integer or float values
         while True:
             operand1 = self.get_reg(inc=False)
 
-            operation = ''
             if self._accept('symbol', '*'):
                 operation = '*'
             elif self._accept('symbol', '/'):
@@ -1365,8 +1345,8 @@ class Parser(Scanner, CodeGenerator):
             else:
                 break
 
-            if type not in ['integer', 'float']:
-                self._type_error('integer or float', type, line)
+            if id_type not in ['integer', 'float']:
+                self._type_error('integer or float', id_type, line)
                 raise ParserTypeError()
 
             line = self._current.line
@@ -1378,10 +1358,10 @@ class Parser(Scanner, CodeGenerator):
                 self._type_error('integer or float', next_type, line)
                 raise ParserTypeError()
 
-            self.generate_operation(operand1, type, operand2, next_type,
-                    operation)
+            self.generate_operation(operand1, id_type, operand2, next_type,
+                                    operation)
 
-        return type
+        return id_type
 
     def _parse_factor(self):
         """<factor> (Protected)
@@ -1399,40 +1379,39 @@ class Parser(Scanner, CodeGenerator):
         Returns:
             The type value of the expression.
         """
-        type = None
-        line = self._current.line
+        id_type = None
 
         if self._accept('symbol', '('):
-            type = self._parse_expression()
+            id_type = self._parse_expression()
             self._match('symbol', ')')
         elif self._accept('string'):
-            type = 'string'
+            id_type = 'string'
             str_val = self._previous.value
 
             self.generate('R[%d] = (int)"%s";' % (self.get_reg(), str_val))
         elif self._accept('keyword', 'true'):
-            type = 'bool'
+            id_type = 'bool'
 
             self.generate('R[%d] = 1;' % (self.get_reg()))
         elif self._accept('keyword', 'false'):
-            type = 'bool'
+            id_type = 'bool'
 
             self.generate('R[%d] = 0;' % (self.get_reg()))
         elif self._accept('symbol', '-'):
             if self._first_name():
-                type = self._parse_name()
+                id_type = self._parse_name()
             elif self._check('integer') or self._check('float'):
-                type = self._parse_number(negate=True)
+                id_type = self._parse_number(negate=True)
             else:
                 self._syntax_error('variable name, integer, or float')
         elif self._first_name():
-            type = self._parse_name()
+            id_type = self._parse_name()
         elif self._check('integer') or self._check('float'):
-            type = self._parse_number(negate=False)
+            id_type = self._parse_number(negate=False)
         else:
             self._syntax_error('factor')
 
-        return type
+        return id_type
 
     def _first_name(self):
         """first(<name>) (Protected)
@@ -1457,7 +1436,6 @@ class Parser(Scanner, CodeGenerator):
         """
         id_name = self._current.value
         id_line = self._current.line
-        id_type = None
 
         self._match('identifier')
 
@@ -1496,7 +1474,7 @@ class Parser(Scanner, CodeGenerator):
             direction = self._ids.get_param_direction(id_name)
             if direction != 'in':
                 self._type_error('\'in\' param',
-                        '\'%s\' param' % direction, id_line)
+                                 '\'%s\' param' % direction, id_line)
                 raise ParserTypeError()
 
         # Generate all code associated with retrieving this value
@@ -1521,7 +1499,7 @@ class Parser(Scanner, CodeGenerator):
             The type of the parsed number.
         """
         number = self._current.value
-        type = self._current.type
+        id_type = self._current.type
 
         # Parse the number (either float or integer type)
         if not self._accept('integer') and not self._accept('float'):
@@ -1529,6 +1507,6 @@ class Parser(Scanner, CodeGenerator):
 
         # Generate the code for this number if desired
         if generate_code:
-            self.generate_number(number, type, negate)
+            self.generate_number(number, id_type, negate)
 
-        return type
+        return id_type

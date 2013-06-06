@@ -24,7 +24,7 @@ from collections import namedtuple
 A named tuple object factory containing token information.
 
 Attributes:
-    type: The datatype of the token to be stored.
+    type: The data type of the token to be stored.
     value: The value of the token being stored.
     line: The line number on which the token was encountered.
 """
@@ -37,7 +37,7 @@ A named tuple object factory containing identifier information.
 
 Attributes:
     name: The identifier name. This acts as the dictionary key.
-    type: The datatype of the identifier.
+    type: The data type of the identifier.
     size: The number of elements of the identifier if a variable.
         If procedure, program, or non-array type, None is expected.
     params: A list of Parameter class objects describing procedure params.
@@ -69,7 +69,7 @@ class IdentifierTable(list):
         pop_scope: Removes the highest scope.
         add: Adds a new identifier to the current or global scope.
         find: Determines if an identifier is in the current of global scope.
-        get_id_location: Determines where the identifer exists in the scope.
+        get_id_location: Determines where the identifier exists in the scope.
         is_global: Determines if an identifier exists in the global scope.
         is_param: Determines if an identifier is a parameter of the scope.
         get_param_direction: Gets the direction of the parameter in the scope.
@@ -138,7 +138,7 @@ class IdentifierTable(list):
             raise ParserNameError('global name must be defined in program scope')
 
         if is_global and (identifier.name in self[0] or (len(self) > 1 and
-                identifier.name in self[1])):
+                          identifier.name in self[1])):
             raise ParserNameError('name already declared at this scope')
 
         if not is_global and identifier.name in self[-1]:
@@ -163,8 +163,6 @@ class IdentifierTable(list):
         Raises:
             ParserNameError if the given identifier is not found in any valid scope.
         """
-        identifier = None
-
         if name in self[-1]:
             identifier = self[-1][name]
         elif name in self[0]:

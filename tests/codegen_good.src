@@ -15,9 +15,6 @@ program codegen_test is
     integer sum[2];
     integer result;
 
-    bool thisistrue;
-    bool thisisfalse;
-
     // Test a procedure declaration. Will be called later
     procedure increment (integer val in, integer result out)
         integer tmp1;
@@ -30,6 +27,12 @@ begin
 
     result := 0;
     increment(4 + 7 + 3, result);
+
+    if (4 + 7 + 3 + 1 == result) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
 
     add1 := 1;
     add2 := 5; 
@@ -49,7 +52,6 @@ begin
         result := 0;
     end if;
 
-    putString("Expect 'result' is 1");
     if (result == 1) then
         putString("SUCCESS");
     else
@@ -57,16 +59,14 @@ begin
     end if;
 
     // Set 'count' to 10 the long way
-    putString("Let's count to 10");
-
     count := 0;
-    for (count := count + 1; count <= 10)
-        putInteger(count);
-
-        if (count == 5) then
-            // Half way there. Print a message
-            putString("We're half way there");
-        end if;
+    for (count := count; count < 10)
+        count := count + 1;
     end for;
 
+    if (count == 10) then
+        putString("SUCCESS");
+    else
+        putString("FAILURE");
+    end if;
 end program

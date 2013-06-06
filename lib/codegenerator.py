@@ -11,12 +11,13 @@ Classes:
     CodeGenerator: A code generator interface for destination file outputting.
 """
 
+
 class CodeGenerator:
     """CodeGenerator class
 
     This class implements code generator function calls to easily attach a
     destination file, input code to generate, and commit the destination
-    file upon successful compilation. This class is designed to be subclassed
+    file upon successful compilation. This class is designed to be inherited
     the be used during the parsing stage of the compiler.
 
     Attributes:
@@ -30,13 +31,15 @@ class CodeGenerator:
         comment: Adds a comment to the generated code with appropriate tabbing.
         tab_push: Increases the tab depth by 1 tab (4 spaces).
         tab_pop: Decreases the tab depth by 1 tab (4 spaces).
-        commit: Commits all code generation and writesto the destination file.
+        commit: Commits all code generation and writes to the destination file.
         get_mm: Provides a free memory space for global or local variables.
         reset_local_ptr: Resets the value for the local pointer to default.
         reset_param_ptr: Resets the value for the param pointer to default.
         get_reg: Provides a free register for intermediate variable use.
         get_label_id: Returns a unique identifier for the procedure call.
         get_unique_call_id: Returns a unique identifier for multiple calls.
+        generate_program_entry: Generates all code associated with setting up
+            the program entry and exit point.
         generate_procedure_call: Generates all code associated with managing
             the memory stack during a procedure call.
         generate_procedure_call_end: Generates code to clean up a procedure
@@ -83,7 +86,7 @@ class CodeGenerator:
         self._param_ptr = 0
         self.reset_param_ptr()
 
-        # Holds the tabcount of the code. tab_push, tab_pop manipulate this
+        # Holds the tab count of the code. tab_push, tab_pop manipulate this
         self._tab_count = 0
 
         # Holds an integer used for unique label generation for if/loop
@@ -279,7 +282,7 @@ class CodeGenerator:
     def tab_push(self):
         """Tab Push
 
-        Pushes the tab (increases the indentiation by 4 spaces) for pretty
+        Pushes the tab (increases the indentation by 4 spaces) for pretty
         code output.
         """
         self._tab_count += 1
@@ -307,7 +310,7 @@ class CodeGenerator:
             with open(self._dest_path, 'w+') as f:
                 f.write(self._generated_code)
         except IOError as e:
-            print('Error: "{0}"'.format(dest_path))
+            print('Error: "%s"' % self._dest_path)
             print('    Could not write to destination file: %s' % e.strerror)
             return False
 
@@ -331,8 +334,6 @@ class CodeGenerator:
             while global variables are offset by the top of main memory.
             See the documentation in README for stack details.
         """
-        var_loc = 0
-
         # Determine size of the identifier
         mem_needed = int(id_size) if id_size is not None else 1
         
@@ -350,7 +351,7 @@ class CodeGenerator:
         """Reset Local Pointer
 
         Resets the pointer to the current scope's local variable portion of
-        the stack. This is used to peroperly allocate space for the local
+        the stack. This is used to properly allocate space for the local
         variables at the start of the scope.
         """
         self._local_ptr = 1
@@ -410,7 +411,39 @@ class CodeGenerator:
 
         return self._unique_id
 
-    def generate_procedure_call(self, proc_name, proc_num, debug):
+    def generate_program_entry(self, program_name, program_num, debug):
+        """Generate Program Entry
+
+        Generates the code associated with managing the entry point for the
+        program. This involves pushing the program return address onto the
+        stack, jumping to the entry point, and creating the program exit
+        section.
+
+        Arguments:
+            program_name: The name of the program.
+            program_num: The label id of the program.
+            debug: Determines if comments should be written to the code.
+        """
+        # Push the return address onto the stack
+        self.comment('Setting program return address', debug)
+        self.generate('MM[R[FP]] = (int)&&%s_%d_end;' %
+                      (program_name, program_num))
+
+        # Make the jump to the entry point
+        self.generate('goto %s_%d_begin;' % (program_name, program_num))
+
+        # Make the main program return
+        self.generate('')
+        self.comment('Creating the program exit point', debug)
+        self.generate('%s_%d_end:' % (program_name, program_num))
+        self.tab_push()
+        self.generate('return 0;')
+        self.tab_pop()
+        self.generate('')
+
+        return
+
+    def generate_procedure_call(self, procedure_name, procedure_num, debug):
         """Generate Procedure Call
 
         Generates the code associated with managing the stack before and
@@ -418,30 +451,30 @@ class CodeGenerator:
         pushing and popping operations.
 
         Arguments:
-            proc_name: The name of the procedure to call.
-            proc_num: The label id of the procedure to call.
+            procedure_name: The name of the procedure to call.
+            procedure_num: The label id of the procedure to call.
             debug: Determines if comments should be written to the code.
         """
         # Save the FP to the stack. Set next FP to return address
         self.comment('Setting caller FP', debug)
         self.generate('R[SP] = R[SP] - 1;')
         self.generate('MM[R[SP]] = R[FP];')
-        self.comment('Setting return addr (current FP)', debug)
+        self.comment('Setting return address (current FP)', debug)
         self.generate('R[SP] = R[SP] - 1;')
         self.generate('R[FP] = R[SP];')
 
         # Generate a new call number so multiple calls do not cause collisions
         call_number = self.get_unique_call_id()
 
-        # Push the return addr onto the stack
+        # Push the return address onto the stack
         self.generate('MM[R[SP]] = (int)&&%s_%d_%d;' %
-                (proc_name, proc_num, call_number))
+                (procedure_name, procedure_num, call_number))
                 
         # Make the jump to the function call
-        self.generate('goto %s_%d;' % (proc_name, proc_num))
+        self.generate('goto %s_%d;' % (procedure_name, procedure_num))
 
         # Generate the return label
-        self.generate('%s_%d_%d:' % (proc_name, proc_num, call_number))
+        self.generate('%s_%d_%d:' % (procedure_name, procedure_num, call_number))
 
         # The SP now points to the return address. Restore the old FP
         self.comment('Restore caller FP', debug)
@@ -459,7 +492,7 @@ class CodeGenerator:
         Arguments:
             debug: Determines if comments are to be written in generated code.
         """
-        self.comment('Move to caller local stack', self.debug)
+        self.comment('Move to caller local stack', debug)
 
         # Finalize the function call. Move the SP off the param list
         self.generate('R[SP] = R[SP] + 1;')
@@ -467,10 +500,10 @@ class CodeGenerator:
         return
 
     def _generate_get_id_in_mm(self, id_obj, id_location, idx_reg, debug):
-        """Genereate Get Identifier in Main Memory (Protected)
+        """Generate Get Identifier in Main Memory (Protected)
 
         Knowing the location in the stack and the offset (mm_ptr) value of
-        a given index, code is genereated to calculate the exact location of
+        a given index, code is generated to calculate the exact location of
         the identifier in main memory.
 
         If identifier is param, offset is the parameter offset.
@@ -487,7 +520,7 @@ class CodeGenerator:
         Returns:
             The register number of the calculated address of the identifier.
         """
-        # Get a new register to calculate the main memory addr of this id
+        # Get a new register to calculate the main memory address of this id
         id_reg = self.get_reg()
 
         self.generate('R[%d] = %d;' % (id_reg, id_obj.mm_ptr))
@@ -509,9 +542,9 @@ class CodeGenerator:
         return id_reg
 
     def generate_name(self, id_obj, id_location, idx_reg, debug):
-        """Genereate Name
+        """Generate Name
 
-        Genereates all code necessary to place the contents of the memory
+        Generates all code necessary to place the contents of the memory
         location of a given identifier into a new register for computation.
 
         Arguments:
@@ -523,7 +556,7 @@ class CodeGenerator:
         """
         # Calculate the position of the identifier in main memory
         id_reg = self._generate_get_id_in_mm(id_obj, id_location, idx_reg,
-                debug)
+                                             debug)
 
         # Retrieve the main memory location and place it in the last register
         self.generate('R[%d] = MM[R[%d]];' % (id_reg, id_reg))
@@ -531,7 +564,7 @@ class CodeGenerator:
         return
 
     def generate_assignment(self, id_obj, id_location, idx_reg, expr_reg,
-            debug):
+                            debug):
         """Generate Assignment
 
         Generates all code necessary to place the outcome of an expression
@@ -547,7 +580,7 @@ class CodeGenerator:
         """
         # Calculate the position of the identifier in main memory
         id_reg = self._generate_get_id_in_mm(id_obj, id_location, idx_reg,
-                debug)
+                                             debug)
 
         # Set the main memory value to the value in the expression register
         self.generate('MM[R[%d]] = R[%d];' % (id_reg, expr_reg))
@@ -607,19 +640,19 @@ class CodeGenerator:
 
         return
 
-    def generate_number(self, number, type, negate):
-        """Genereate Number
+    def generate_number(self, number, token_type, negate):
+        """Generate Number
 
         Generates the code to store a parsed number in a new register.
 
         Arguments:
             number: The parsed number value (this is a string representation).
-            type: The type of the number (either 'integer' or 'float')
+            token_type: The type of the number (either 'integer' or 'float')
             negate: A boolean to determine whether or not to negate the value.
         """
         reg = self.get_reg()
 
-        if type == 'integer':
+        if token_type == 'integer':
             # This is an integer value, set it to the register
             if negate:
                 self.generate('R[%d] = -%s;' % (reg, number))
@@ -650,8 +683,8 @@ class CodeGenerator:
         self.comment('Moving SP to FP (return address)', debug)
         self.generate('R[SP] = R[FP];')
 
-        # Goto the return label to exit the procedure
-        self.comment('Return to calling functon', debug)
+        # Go to the return label to exit the procedure
+        self.comment('Return to calling function', debug)
         self.generate('goto *(void*)MM[R[FP]];')
 
         return
@@ -678,7 +711,7 @@ class CodeGenerator:
 
         if type1 != 'float' and type2 != 'float':
             self.generate('R[%d] = R[%d] %s R[%d];' %
-                    (result, reg1, operation, reg2))
+                          (result, reg1, operation, reg2))
             return result
 
         if type1 != 'float':

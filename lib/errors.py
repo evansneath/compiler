@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+
 class ParserError(Exception):
     """ParserError class
 
@@ -39,4 +40,3 @@ class ParserRuntimeError(ParserError):
     Thrown when a runtime error occurs in the parser.
     """
     pass
-

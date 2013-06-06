@@ -5,8 +5,6 @@ program recursiontest is
 
     procedure count_to_ten(integer current_val in)
     begin
-        putInteger(current_val);
-
         if (current_val < 10) then
             count_to_ten(current_val + 1);
         else
