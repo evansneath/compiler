@@ -81,7 +81,8 @@ class Scanner:
         # Try to read all data from the file and split by line
         try:
             with open(src_path) as f:
-                self._src = f.read().splitlines(keepends=True)
+                keepends = True
+                self._src = f.read().splitlines(keepends)
         except IOError:
             print('Error: "%s"' % src_path)
             print('    Could not read inputted file')
