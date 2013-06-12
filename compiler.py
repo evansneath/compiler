@@ -10,7 +10,7 @@ License: Open Software License v3.0
 
 Functions:
     parse_arguments: Parses incoming command line arguments.
-    compile: Executes the complete compilation process.
+    run_compiler: Executes the complete compilation process.
 """
 
 # Import standard libraries
