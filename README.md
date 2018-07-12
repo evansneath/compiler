@@ -1,24 +1,24 @@
 Compiler
 ========
 
-##Description
+## Description
 A single-pass, recursive decent `LL(1)` compiler written by hand for a made-up.
 language. This compiler is written entirely in Python 3 and uses the `gcc`
 compiler to finish compilation of the generated intermediate C representation.
 
-##Author
+## Author
 Created by [Evan Sneath](http://github.com/evansneath).
 
-##License
+## License
 This software licensed under the
 [Open Software License v3.0](http://www.opensource.org/licenses/OSL-3.0).
 
-##Dependencies
+## Dependencies
 In order to run, this software requires the following dependencies:
 
 * [Python 3](http://python.org/download/releases/3.3.2/)
 
-##Progress
+## Progress
 
 <table>
 <tr><td><b>Component</b></td><td><b>Status</b></td></tr>
@@ -29,7 +29,7 @@ In order to run, this software requires the following dependencies:
 <tr><td>Runtime</td><td>Completed</td></tr>
 </table>
 
-##Usage
+## Usage
 ```
 usage: compiler.py [-h] [-d] [-o OUT] source
 
@@ -53,9 +53,9 @@ The `tests/` directory contains test source files which have several examples
 of token scanning with error/warning handling, grammar parsing, code
 generation, and runtime libraries.
 
-##Implementation Details
+## Implementation Details
 
-###Software
+### Software
 
 In determining the implementation language, robustness was chosen over speed as
 the deciding factor for the compiler. Python 3 was selected because ease of
@@ -66,7 +66,7 @@ As I progressed through the parser stage of the compiler, it became clear that
 the simple exception raising and handling would be useful for displaying
 compiler errors and trapping at resync points to continue syntax parsing.
 
-###Structure
+### Structure
 
 For the sake of modularity and ease of debugging, the program is structured in
 a hierarchical fashion.
@@ -84,7 +84,7 @@ objects. The `datatypes.py` and `errors.py` source files containing several
 data types and exception classes respectively which are used in the various
 components of the compiler.
 
-###Scanning
+### Scanning
 
 The implementation of the language scanner first tackles the problem of source
 code parsing by splitting the source code into a list of distinct lines. Not
@@ -102,7 +102,7 @@ correct as many lexical errors as possible. For instance, if a string literal
 has no end quote a warning will be thrown and a quote will be assumed at the
 end of the line.
 
-###Parsing
+### Parsing
 
 In order to eliminate loops caused by recursive grammar, any left-recursion in
 the language grammar was rewritten.
@@ -122,7 +122,7 @@ parsing and the parsing will continue to the next statement or declaration.
 Note that once a fatal error or any kind is encountered, code will no longer
 be generated.
 
-###Code Generation
+### Code Generation
 
 Memory and registers for the operation of the program are defined and used as
 32-bit integer arrays. This allows for simple addressing of memory and register
@@ -224,7 +224,7 @@ else_label:
 end_if_label:
 ```
 
-###Runtime Environment
+### Runtime Environment
 Initially, I had created a separate C library to implement the runtime
 functions necessary. I determined that these functions were simple enough to be
 handwritten directly inline with the generated code as I progressed though
@@ -232,9 +232,9 @@ development. The runtime functions use the same principles of stack memory
 referencing as other procedures and are populated in the identifiers table
 manually at the start of parsing.
 
-##Language Specifications
+## Language Specifications
 
-###Syntax
+### Syntax
 ```
 <program> ::=
     <program_header> <program_body>
@@ -355,7 +355,7 @@ manually at the start of parsing.
     "[a-zA-Z0-9 _,;:.']*"
 ```
 
-###Semantics
+### Semantics
 * Procedure parameters are transmitted by value. Recursion is supported.
 * Non-local variables and functions are not visible except for those variables
    and functions in the outermost scope prefixed with the global reserved word.
